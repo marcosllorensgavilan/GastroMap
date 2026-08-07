@@ -1,0 +1,4 @@
+.env
+node_modules/
+extract.osm.pbf
+*.log
