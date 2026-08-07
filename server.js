@@ -28,6 +28,7 @@ const app = express();
 app.use(cors()); // permite que gastromap.html (abierto en el navegador) llame a este servidor
 app.use(express.json());
 app.use(express.static(__dirname)); // sirve gastromap.html (si lo copias a esta carpeta) para poder abrirlo desde el móvil
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'gastromap.html'))); // la URL raíz abre GastroMap directamente, más fácil de compartir
 
 let db;
 try {
