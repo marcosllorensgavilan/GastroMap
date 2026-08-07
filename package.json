@@ -1,7 +1,7 @@
 {
   "name": "gastromap-db",
   "version": "1.0.0",
-  "description": "Base de datos local de restaurantes para GastroMap, construida a partir de un extracto de OpenStreetMap (independiente de los servidores públicos de Overpass).",
+  "description": "Base de datos local de restaurantes para GastroMap, construida a partir de un extracto de OpenStreetMap (independiente de los servidores p\u00fablicos de Overpass).",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -10,6 +10,7 @@
   "dependencies": {
     "better-sqlite3": "^13.0.3",
     "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "dotenv": "^16.4.5"
   }
 }
