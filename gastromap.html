@@ -980,15 +980,16 @@ a{text-decoration:none;color:inherit}
     <div class="profile-ava" id="pfl-avatar">?</div>
     <div class="profile-name" id="pfl-name">Sin iniciar sesión</div>
     <div class="profile-email" id="pfl-email">Ve a Ajustes para crear tu cuenta</div>
-    <div class="profile-level-badge">🛡 Crítico Verificado</div>
+    <div class="profile-level-badge" id="pfl-level-badge">⭐ Foodie</div>
     <div class="profile-stats-row">
       <div class="pstat"><div class="pstat-num" id="pstat-resenas">49</div><div class="pstat-lbl">Reseñas</div></div>
       <div class="pstat"><div class="pstat-num" id="pstat-favs">0</div><div class="pstat-lbl">Favoritos</div></div>
-      <div class="pstat"><div class="pstat-num">500</div><div class="pstat-lbl">Puntos</div></div>
+      <div class="pstat"><div class="pstat-num" id="pstat-puntos">0</div><div class="pstat-lbl">Puntos</div></div>
     </div>
   </div>
   <div class="profile-nav">
     <button class="profile-nav-item active" onclick="profileTab(this,'rep')">Reputación</button>
+    <button class="profile-nav-item" onclick="profileTab(this,'misresenas')">Mis Reseñas</button>
     <button class="profile-nav-item" onclick="profileTab(this,'foodprint')">Foodprint</button>
     <button class="profile-nav-item" onclick="profileTab(this,'favs')">Favoritos</button>
     <button class="profile-nav-item" onclick="profileTab(this,'niveles')">Niveles</button>
@@ -998,19 +999,20 @@ a{text-decoration:none;color:inherit}
       <div class="rep-card">
         <div class="rep-header">🏆 Sistema de Reputación</div>
         <div class="rep-progress">
-          <span>Crítico Verificado</span><span>500 puntos</span>
+          <span id="rep-level-name">Foodie</span><span id="rep-level-pts">0 puntos</span>
         </div>
-        <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+        <div class="progress-bar"><div class="progress-fill" id="rep-progress-fill" style="width:0%"></div></div>
         <div class="stats-grid">
-          <div class="stat-cell"><div class="stat-cell-num" id="rep-resenas">49</div><div class="stat-cell-lbl">Reseñas</div></div>
+          <div class="stat-cell"><div class="stat-cell-num" id="rep-resenas">0</div><div class="stat-cell-lbl">Reseñas</div></div>
           <div class="stat-cell"><div class="stat-cell-num" id="rep-favs">0</div><div class="stat-cell-lbl">Favoritos</div></div>
         </div>
         <div class="how-to">Cómo ganar puntos:</div>
         <div class="earn-item">📝 Publicar reseña: <strong style="margin-left:4px">+10 pts</strong></div>
-        <div class="earn-item">📸 Subir fotos: <strong style="margin-left:4px">+5 pts</strong></div>
         <div class="earn-item">♥ Guardar favorito: <strong style="margin-left:4px">+2 pts</strong></div>
-        <div class="earn-item">✅ Verificar visita: <strong style="margin-left:4px">+15 pts</strong></div>
       </div>
+    </div>
+    <div id="profile-tab-misresenas" style="display:none">
+      <div id="mis-resenas-list"></div>
     </div>
     <div id="profile-tab-foodprint" style="display:none">
       <div id="foodprint-body"></div>
@@ -1032,10 +1034,10 @@ a{text-decoration:none;color:inherit}
       <div class="rep-card">
         <div class="rep-header">⭐ Niveles</div>
         <div class="level-list">
-          <div class="level-row"><div class="level-icon">⭐</div><div class="level-name">Foodie</div><div class="level-pts">0+ puntos</div></div>
-          <div class="level-row"><div class="level-icon">🏅</div><div class="level-name">Foodie Pro</div><div class="level-pts">50+ puntos</div></div>
-          <div class="level-row"><div class="level-icon">🌐</div><div class="level-name">Experto Local</div><div class="level-pts">200+ puntos</div></div>
-          <div class="level-row current"><div class="level-icon">🛡</div><div class="level-name">Crítico Verificado</div><div class="level-pts">500+ puntos</div><div class="current-badge">Actual</div></div>
+          <div class="level-row" id="level-row-0"><div class="level-icon">⭐</div><div class="level-name">Foodie</div><div class="level-pts">0+ puntos</div><div class="current-badge" id="level-badge-0" style="display:none">Actual</div></div>
+          <div class="level-row" id="level-row-1"><div class="level-icon">🏅</div><div class="level-name">Foodie Pro</div><div class="level-pts">50+ puntos</div><div class="current-badge" id="level-badge-1" style="display:none">Actual</div></div>
+          <div class="level-row" id="level-row-2"><div class="level-icon">🌐</div><div class="level-name">Experto Local</div><div class="level-pts">200+ puntos</div><div class="current-badge" id="level-badge-2" style="display:none">Actual</div></div>
+          <div class="level-row" id="level-row-3"><div class="level-icon">🛡</div><div class="level-name">Crítico Verificado</div><div class="level-pts">500+ puntos</div><div class="current-badge" id="level-badge-3" style="display:none">Actual</div></div>
         </div>
       </div>
     </div>
@@ -1667,9 +1669,77 @@ function toggleFav(evt,detail){
   localStorage.setItem('gm_favs',JSON.stringify(favorites));
   updateFavCount();
 }
+const LEVELS=[{min:0,name:'Foodie',icon:'⭐'},{min:50,name:'Foodie Pro',icon:'🏅'},{min:200,name:'Experto Local',icon:'🌐'},{min:500,name:'Crítico Verificado',icon:'🛡'}];
+let myReviewCount=0;
+function computePoints(){ return myReviewCount*10 + favorites.length*2; }
+function getLevelIndex(points){
+  let idx=0;
+  for(let i=0;i<LEVELS.length;i++){ if(points>=LEVELS[i].min) idx=i; }
+  return idx;
+}
+function updateReputationUI(){
+  const points=computePoints();
+  const idx=getLevelIndex(points);
+  const level=LEVELS[idx];
+  const next=LEVELS[idx+1];
+  const pct=next ? Math.min(100,Math.round(((points-level.min)/(next.min-level.min))*100)) : 100;
+
+  const puntosEl=document.getElementById('pstat-puntos'); if(puntosEl) puntosEl.textContent=points;
+  const badgeEl=document.getElementById('pfl-level-badge'); if(badgeEl) badgeEl.textContent=level.icon+' '+level.name;
+  const nameEl=document.getElementById('rep-level-name'); if(nameEl) nameEl.textContent=level.name;
+  const ptsEl=document.getElementById('rep-level-pts'); if(ptsEl) ptsEl.textContent=points+' puntos';
+  const fillEl=document.getElementById('rep-progress-fill'); if(fillEl) fillEl.style.width=pct+'%';
+
+  LEVELS.forEach((l,i)=>{
+    const badge=document.getElementById('level-badge-'+i);
+    if(badge) badge.style.display = i===idx ? 'block' : 'none';
+    const row=document.getElementById('level-row-'+i);
+    if(row) row.classList.toggle('current', i===idx);
+  });
+}
+async function refreshMyReviewCount(){
+  if(!currentUser){ myReviewCount=0; updateReputationUI(); return; }
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/reviews/mine`,{headers:{'Authorization':'Bearer '+authToken}});
+    if(resp.ok){ const data=await resp.json(); myReviewCount=data.count; }
+  }catch(e){/* nos quedamos con el último valor conocido */}
+  const resenasEls=[document.getElementById('pstat-resenas'),document.getElementById('rep-resenas')].filter(Boolean);
+  resenasEls.forEach(el=>el.textContent=myReviewCount);
+  updateReputationUI();
+}
+async function renderMyReviews(){
+  const list=document.getElementById('mis-resenas-list');
+  if(!list) return;
+  if(!currentUser){
+    list.innerHTML='<div class="empty-state"><div class="empty-icon">🔐</div><div class="empty-title">Inicia sesión</div><div class="empty-sub">Ve a Ajustes para crear tu cuenta o entrar, y aquí verás tus reseñas.</div></div>';
+    return;
+  }
+  list.innerHTML='<div class="inline-loading"><div class="spinner"></div> Cargando tus reseñas…</div>';
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/reviews/mine/list`,{headers:{'Authorization':'Bearer '+authToken}});
+    const data=await resp.json();
+    const reviews=data.reviews||[];
+    if(!reviews.length){
+      list.innerHTML='<div class="empty-state"><div class="empty-icon">✍️</div><div class="empty-title">Aún no has escrito ninguna reseña</div><div class="empty-sub">Entra a un restaurante y cuenta tu experiencia.</div></div>';
+      return;
+    }
+    list.innerHTML=reviews.map(r=>`
+      <div class="review-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong>${r.restaurant_name}</strong>
+          <span style="color:var(--orange)">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
+        </div>
+        <div style="font-size:13px;color:var(--textm);line-height:1.5;margin-bottom:6px">${r.text}</div>
+        <div style="font-size:11px;color:var(--textl)">${new Date(r.created_at).toLocaleDateString('es-ES')}</div>
+      </div>`).join('');
+  }catch(e){
+    list.innerHTML='<div class="ia-prose">No se pudieron cargar tus reseñas.</div>';
+  }
+}
 function updateFavCount(){
   document.getElementById('pstat-favs').textContent=favorites.length;
   document.getElementById('rep-favs').textContent=favorites.length;
+  updateReputationUI();
 }
 function favLocation(f){
   // Extrae algo tipo "ciudad/país" de la dirección guardada, para el filtro de ubicación
@@ -2057,6 +2127,7 @@ async function submitReview(){
     if(!resp.ok){ alert(data.error||'No se pudo publicar la reseña.'); return; }
     renderReviewForm();
     loadReviews(d.id,d.name);
+    refreshMyReviewCount();
   }catch(e){
     alert('Error de conexión al publicar la reseña.');
   }
@@ -2151,21 +2222,16 @@ function switchAuthView(view){ authView=view; renderAuthUI(); }
 function updateProfileHero(){
   const nameEl=document.getElementById('pfl-name'), emailEl=document.getElementById('pfl-email'), avaEl=document.getElementById('pfl-avatar');
   if(!nameEl) return;
-  const resenasEls=[document.getElementById('pstat-resenas'),document.getElementById('rep-resenas')].filter(Boolean);
   if(currentUser){
     nameEl.textContent=currentUser.name;
     emailEl.textContent=currentUser.email;
     avaEl.textContent=currentUser.name.charAt(0).toUpperCase();
-    fetch(`${LOCAL_DB_URL}/api/reviews/mine`,{headers:{'Authorization':'Bearer '+authToken}})
-      .then(r=>r.ok?r.json():null)
-      .then(data=>{ if(data) resenasEls.forEach(el=>el.textContent=data.count); })
-      .catch(()=>{});
   }else{
     nameEl.textContent='Sin iniciar sesión';
     emailEl.textContent='Ve a Ajustes para crear tu cuenta';
     avaEl.textContent='?';
-    resenasEls.forEach(el=>el.textContent='0');
   }
+  refreshMyReviewCount();
 }
 function renderAuthUI(){
   updateProfileHero();
@@ -2719,12 +2785,13 @@ function openCreatorRecommendation(i){
 function profileTab(btn,tab){
   document.querySelectorAll('.profile-nav-item').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['rep','foodprint','favs','niveles'].forEach(t=>{
+  ['rep','misresenas','foodprint','favs','niveles'].forEach(t=>{
     const el=document.getElementById('profile-tab-'+t);
     if(el) el.style.display=t===tab?'block':'none';
   });
   if(tab==='favs') renderFavs();
   if(tab==='foodprint') renderFoodprint();
+  if(tab==='misresenas') renderMyReviews();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2883,14 +2950,23 @@ function loadDarkModePref(){
 }
 
 // --- Borrar datos ---
-function clearMyData(){
-  if(!confirm('Esto borra tus favoritos, tu Foodprint y tus preferencias guardadas en este navegador. No se puede deshacer. ¿Continuar?')) return;
+async function clearMyData(){
+  const msg = currentUser
+    ? 'Esto borra tus favoritos, tu Foodprint y tus preferencias guardadas en este navegador, Y TAMBIÉN todas tus reseñas publicadas (se borran del servidor, cualquiera que las viera dejará de verlas). No se puede deshacer. ¿Continuar?'
+    : 'Esto borra tus favoritos, tu Foodprint y tus preferencias guardadas en este navegador. No se puede deshacer. ¿Continuar?';
+  if(!confirm(msg)) return;
   localStorage.removeItem('gm_favs');
   localStorage.removeItem('gm_default_allergies');
   favorites=[];
   updateFavCount();
   loadDefaultAllergiesIntoAjustes();
-  alert('Listo, tus datos guardados en este navegador se han borrado.');
+  if(currentUser){
+    try{
+      await fetch(`${LOCAL_DB_URL}/api/reviews/mine`,{method:'DELETE',headers:{'Authorization':'Bearer '+authToken}});
+    }catch(e){/* si falla la conexión, al menos ya se borró lo local */}
+    refreshMyReviewCount();
+  }
+  alert('Listo, tus datos guardados se han borrado.');
 }
 
 // ═══════════════════════════════════════════════════════════

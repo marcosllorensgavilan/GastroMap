@@ -194,6 +194,19 @@ app.get('/api/reviews/mine', requireAuth, (req, res) => {
   res.json({ count });
 });
 
+app.get('/api/reviews/mine/list', requireAuth, (req, res) => {
+  const rows = appDb.prepare(`
+    SELECT id, restaurant_id, restaurant_name, rating, text, created_at
+    FROM reviews WHERE user_id = ? ORDER BY created_at DESC
+  `).all(req.user.id);
+  res.json({ reviews: rows });
+});
+
+app.delete('/api/reviews/mine', requireAuth, (req, res) => {
+  const info = appDb.prepare('DELETE FROM reviews WHERE user_id = ?').run(req.user.id);
+  res.json({ ok: true, deleted: info.changes });
+});
+
 function fakeScore(name) {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
