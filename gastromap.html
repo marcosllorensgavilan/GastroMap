@@ -181,12 +181,18 @@ a{text-decoration:none;color:inherit}
   padding:14px 16px;border-bottom:0.5px solid var(--g2);
   position:sticky;top:0;background:var(--white);z-index:10;
 }
-.map-search-row{display:flex;gap:8px;margin-bottom:10px}
+.map-search-row{display:flex;gap:8px;margin-bottom:10px;position:relative}
 .map-input{
   flex:1;background:var(--g1);border:0.5px solid var(--g2);
   border-radius:var(--rsm);padding:9px 12px;font-size:13px;color:var(--text);outline:none;
 }
 .map-input:focus{border-color:var(--orange)}
+.search-suggest-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--white);border:1px solid var(--g2);border-radius:var(--rsm);margin-top:6px;box-shadow:var(--shadow2);z-index:2000;overflow:hidden;display:none;max-height:280px;overflow-y:auto}
+.search-suggest-dropdown.show{display:block}
+.search-suggest-label{font-size:10px;font-weight:700;color:var(--textl);text-transform:uppercase;letter-spacing:0.4px;padding:8px 14px 4px}
+.search-suggest-item{padding:9px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--text)}
+.search-suggest-item:hover{background:var(--g1)}
+.search-suggest-item .ssi-icon{font-size:13px;flex-shrink:0}
 .map-search-btn{
   padding:9px 16px;background:var(--orange);color:white;border:none;
   border-radius:var(--rsm);font-size:13px;font-weight:600;
@@ -616,6 +622,7 @@ a{text-decoration:none;color:inherit}
     <p>Ranking inteligente con datos reales, críticos verificados y comunidad gastronómica</p>
     <div class="search-box">
       <input id="hero-search" placeholder="Busca una ciudad… Valencia, Tokyo, Miami…" onkeydown="if(event.key==='Enter')heroSearch()">
+      <div class="search-suggest-dropdown" id="hero-search-suggest"></div>
       <button class="btn-search" onclick="heroSearch()">Buscar</button>
     </div>
     <div class="city-chips" id="hero-chips">
@@ -659,6 +666,7 @@ a{text-decoration:none;color:inherit}
       <div class="map-sidebar-header">
         <div class="map-search-row">
           <input class="map-input" id="map-city-input" placeholder="Ciudad, o un plato: tapas, sushi, paella…" onkeydown="if(event.key==='Enter')mapSearch()">
+          <div class="search-suggest-dropdown" id="map-city-input-suggest"></div>
           <button class="map-search-btn" onclick="mapSearch()">Buscar</button>
         </div>
         <div class="map-stats" id="map-stats">Mueve o acerca el mapa — los restaurantes se cargan solos</div>
@@ -1337,6 +1345,74 @@ async function fetchOSMCity(city){
 // EXPLORAR
 // ═══════════════════════════════════════════════════════════
 let explorarPlaces = [], explorarCity = '';
+// ═══════════════════════════════════════════════════════════
+// SUGERENCIAS DE BÚSQUEDA (autocompletar + historial reciente)
+// ═══════════════════════════════════════════════════════════
+const SEARCH_HISTORY_KEY='gm_search_history';
+function getSearchHistory(){
+  try{ return JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY)||'[]'); }catch(e){ return []; }
+}
+function addToSearchHistory(term){
+  term=(term||'').trim();
+  if(!term) return;
+  let hist=getSearchHistory().filter(t=>t.toLowerCase()!==term.toLowerCase());
+  hist.unshift(term);
+  localStorage.setItem(SEARCH_HISTORY_KEY,JSON.stringify(hist.slice(0,5)));
+}
+function hideSuggestDropdown(inputId){
+  const dd=document.getElementById(inputId+'-suggest');
+  if(dd) dd.classList.remove('show');
+}
+function renderSuggestItems(inputId,items,runSearch){
+  const dd=document.getElementById(inputId+'-suggest');
+  if(!dd) return;
+  if(!items.length){ dd.classList.remove('show'); return; }
+  dd.innerHTML=items.map((it,i)=>`<div class="search-suggest-item" data-i="${i}"><span class="ssi-icon">${it.icon}</span><span>${it.label}</span></div>`).join('');
+  [...dd.querySelectorAll('.search-suggest-item')].forEach((el,i)=>{
+    el.onclick=()=>{
+      document.getElementById(inputId).value=items[i].value;
+      hideSuggestDropdown(inputId);
+      runSearch();
+    };
+  });
+  dd.classList.add('show');
+}
+function showHistorySuggestions(inputId,runSearch){
+  const hist=getSearchHistory();
+  renderSuggestItems(inputId, hist.map(h=>({icon:'🕐',label:h,value:h})), runSearch);
+}
+let suggestDebounceTimer=null;
+function attachSearchSuggestions(inputId,{runSearch,includeFood}){
+  const input=document.getElementById(inputId);
+  if(!input) return;
+  input.addEventListener('focus',()=>{ if(!input.value.trim()) showHistorySuggestions(inputId,runSearch); });
+  input.addEventListener('input',()=>{
+    const q=input.value.trim();
+    clearTimeout(suggestDebounceTimer);
+    if(!q){ showHistorySuggestions(inputId,runSearch); return; }
+    const qLower=q.toLowerCase();
+    const foodItems = includeFood
+      ? Object.keys(FOOD_KEYWORDS).filter(k=>k.startsWith(qLower)).slice(0,3).map(k=>({icon:'🍽',label:cap(k),value:k}))
+      : [];
+    renderSuggestItems(inputId,foodItems,runSearch); // se ve algo al momento mientras llega la respuesta de ciudades
+    suggestDebounceTimer=setTimeout(async()=>{
+      if(input.value.trim().toLowerCase()!==qLower) return; // ya escribió algo más, esta respuesta ya no vale
+      try{
+        const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),4000);
+        const resp=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`,{headers:{'Accept-Language':'es'},signal:ctrl.signal});
+        clearTimeout(t);
+        const data=await resp.json();
+        const cityItems=data.map(d=>({icon:'📍',label:d.display_name.split(',').slice(0,3).join(','),value:d.display_name.split(',')[0].trim()}));
+        renderSuggestItems(inputId,[...foodItems,...cityItems],runSearch);
+      }catch(e){/* sin conexión o tardó demasiado — nos quedamos con lo que ya había */}
+    },350);
+  });
+  document.addEventListener('click',(e)=>{
+    const dd=document.getElementById(inputId+'-suggest');
+    if(dd && !input.contains(e.target) && !dd.contains(e.target)) dd.classList.remove('show');
+  });
+}
+
 function setHeroCity(c){document.getElementById('hero-search').value=c;heroSearch();}
 function resetCategoryFilters(){
   const filters=document.getElementById('explorar-filters');
@@ -1351,6 +1427,8 @@ function resetCategoryFilters(){
 async function heroSearch(){
   const city = document.getElementById('hero-search').value.trim();
   if(!city) return;
+  addToSearchHistory(city);
+  hideSuggestDropdown('hero-search');
   explorarCity = city;
   const res = document.getElementById('explorar-results');
   const title = document.getElementById('explorar-section-title');
@@ -1506,6 +1584,8 @@ async function searchByFoodKeyword(query,cuisineMatches){
 async function mapSearch(){
   const query = document.getElementById('map-city-input').value.trim();
   if(!query||!leafletMap) return;
+  addToSearchHistory(query);
+  hideSuggestDropdown('map-city-input');
   document.getElementById('map-loading').classList.add('show');
   document.getElementById('map-stats').innerHTML='Buscando…';
   try{
@@ -2997,6 +3077,8 @@ loadCurrentUser();
 loadDefaultAllergiesIntoAjustes();
 loadDarkModePref();
 applyTranslations();
+attachSearchSuggestions('hero-search',{runSearch:heroSearch,includeFood:false});
+attachSearchSuggestions('map-city-input',{runSearch:mapSearch,includeFood:true});
 </script>
 </body>
 </html>
