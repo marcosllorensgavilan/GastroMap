@@ -1,0 +1,2907 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GastroMap — Descubre dónde come el mundo</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1A1613;--navy2:#2A2420;--navy3:#3A322C;
+  --orange:#E0995C;--orange2:#E8AB78;
+  --gold:#2FA875;--gold2:#3DBE87;
+  --purple:#8B7FE0;--purple-bg:rgba(139,127,224,0.12);
+  --bg:#FAF8F4;--white:#FFFFFF;
+  --g1:#F5F2EC;--g2:#E9E4D9;--g3:#C8C3B8;
+  --text:#1A1613;--textm:#4A4540;--textl:#8A8580;
+  --r:12px;--rsm:8px;--rlg:18px;
+  --serif:'Playfair Display',Georgia,serif;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 12px rgba(0,0,0,0.04);
+  --shadow2:0 2px 8px rgba(0,0,0,0.08),0 8px 24px rgba(0,0,0,0.06);
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body.dark-mode{
+  --bg:#161412;--white:#221F1B;--g1:#2A2620;--g2:#3A342C;--g3:#4A433A;
+  --text:#F2EFE9;--textm:#C9C2B6;--textl:#8A8378;
+}
+body.dark-mode img{filter:brightness(0.92)}
+button{cursor:pointer;font-family:inherit}
+input,textarea,select{font-family:inherit}
+a{text-decoration:none;color:inherit}
+
+/* ── NAV ── */
+.nav{
+  position:fixed;top:0;left:0;right:0;z-index:1000;
+  background:var(--white);
+  display:flex;align-items:center;gap:0;
+  padding:0 24px;height:60px;
+  border-bottom:1px solid var(--g2);
+}
+.nav-logo{display:flex;align-items:center;gap:9px;flex-shrink:0;margin-right:28px}
+.logo-icon{width:32px;height:32px;border-radius:8px;object-fit:cover;display:block;flex-shrink:0}
+.logo-text{font-family:var(--serif);font-size:19px;font-weight:700;color:var(--text);letter-spacing:-0.3px}
+.logo-text span{color:var(--orange)}
+.nav-links{display:flex;align-items:center;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none}
+.nav-links::-webkit-scrollbar{display:none}
+.nav-link{
+  display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:8px;
+  font-size:13.5px;font-weight:500;color:var(--textl);
+  border:none;background:none;white-space:nowrap;transition:all 0.15s;
+}
+.nav-link:hover{color:var(--textm);background:var(--g1)}
+.nav-link.active{color:var(--orange);background:rgba(224,153,92,0.12);font-weight:600}
+.nav-link .icon{font-size:15px}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px}
+.nav-avatar{width:30px;height:30px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:white;border:1.5px solid var(--g2)}
+
+/* ── PAGES ── */
+.page{display:none;padding-top:60px;min-height:100vh}
+.page.active{display:block}
+
+/* ── EXPLORAR ── */
+.hero{
+  background:var(--bg);padding:56px 24px 44px;text-align:center;
+  position:relative;overflow:hidden;
+}
+.hero-tag{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--g1);border:0.5px solid var(--g2);
+  color:var(--textm);font-size:11px;font-weight:500;
+  padding:4px 12px;border-radius:20px;margin-bottom:20px;position:relative;
+}
+.hero h1{
+  font-family:var(--serif);font-size:46px;font-weight:700;color:var(--text);line-height:1.15;
+  letter-spacing:-0.5px;margin-bottom:10px;position:relative;
+}
+.hero h1 em{color:var(--orange);font-style:normal}
+.hero p{font-size:15px;color:var(--textl);margin-bottom:32px;position:relative}
+.search-box{
+  max-width:560px;margin:0 auto 20px;position:relative;display:flex;gap:8px;
+}
+.search-box input{
+  flex:1;background:var(--white);border:1px solid var(--g2);
+  border-radius:var(--rsm);padding:12px 16px;color:var(--text);font-size:14px;outline:none;
+  transition:border-color 0.2s;
+}
+.search-box input::placeholder{color:var(--textl)}
+.search-box input:focus{border-color:var(--orange)}
+.btn-search{
+  padding:12px 22px;background:var(--orange);color:white;border:none;
+  border-radius:var(--rsm);font-size:14px;font-weight:600;white-space:nowrap;
+  transition:background 0.2s;
+}
+.btn-search:hover{background:var(--orange2)}
+.btn-search:disabled{opacity:0.55;cursor:not-allowed}
+.city-chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;position:relative}
+.city-chip{
+  padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;
+  background:var(--white);border:0.5px solid var(--g2);
+  color:var(--textm);transition:all 0.15s;
+}
+.city-chip:hover{background:var(--orange);color:white;border-color:var(--orange)}
+
+.section{padding:28px 24px}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.section-title{font-family:var(--serif);font-size:20px;font-weight:700;color:var(--text)}
+.section-title em{color:var(--orange);font-style:normal}
+.see-all{font-size:13px;color:var(--orange);font-weight:500}
+
+/* ── CARDS ── */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.rest-card{
+  background:var(--white);border-radius:16px;
+  border:1px solid var(--g2);overflow:hidden;
+  box-shadow:var(--shadow);transition:all 0.2s;cursor:pointer;
+}
+.rest-card:hover{box-shadow:var(--shadow2);transform:translateY(-3px)}
+.card-img{
+  height:170px;position:relative;overflow:hidden;
+  background:var(--g1);
+  display:flex;align-items:center;justify-content:center;font-size:11px;color:transparent;
+}
+.card-rank{
+  position:absolute;top:10px;left:10px;
+  background:var(--navy);color:white;font-size:11px;font-weight:700;
+  padding:3px 9px;border-radius:20px;border:1.5px solid rgba(255,255,255,0.15);
+}
+.card-rank.gold{background:var(--gold);color:white}
+.card-score{
+  position:absolute;top:10px;right:10px;
+  background:var(--gold);
+  color:white;font-size:12px;font-weight:700;
+  padding:3px 9px;border-radius:20px;
+}
+.card-save{
+  position:absolute;bottom:10px;right:10px;
+  width:30px;height:30px;border-radius:50%;
+  background:rgba(255,255,255,0.9);border:none;
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+  transition:all 0.15s;
+}
+.card-save:hover{background:white;transform:scale(1.1)}
+.card-save.saved{color:var(--orange)}
+.card-badge-row{position:absolute;bottom:10px;left:10px;display:flex;gap:4px}
+.cbadge{font-size:9px;font-weight:600;padding:2px 7px;border-radius:20px}
+.cbadge-trending{background:var(--orange);color:white}
+.cbadge-top{background:var(--gold);color:var(--navy)}
+.card-body{padding:14px}
+.card-name{font-family:var(--serif);font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-cuisine{font-size:12px;color:var(--textl);margin-bottom:8px}
+.card-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card-rating{display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;color:var(--gold)}
+.card-price{font-size:11px;color:var(--textl)}
+.card-addr{font-size:11px;color:var(--textl);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{font-size:10px;padding:2px 7px;border-radius:20px;background:var(--g1);color:var(--textm);font-weight:500}
+.tag-top{background:rgba(224,153,92,0.12);color:var(--orange);font-weight:600}
+.tag-creators{background:var(--purple-bg);color:var(--purple);font-weight:600}
+.tag-trend{background:rgba(224,90,90,0.1);color:#D45A5A;font-weight:600}
+
+/* ── FILTROS ── */
+.filter-bar{
+  display:flex;gap:8px;padding:14px 24px;overflow-x:auto;scrollbar-width:none;
+  background:var(--white);border-bottom:0.5px solid var(--g2);position:sticky;top:56px;z-index:100;
+}
+.filter-bar::-webkit-scrollbar{display:none}
+.filter-btn{
+  flex-shrink:0;padding:7px 16px;border-radius:20px;font-size:12px;font-weight:500;
+  background:var(--g1);border:0.5px solid var(--g2);color:var(--textm);transition:all 0.15s;
+}
+.filter-btn.active{background:var(--orange);color:white;border-color:var(--orange)}
+.filter-btn:hover:not(.active){border-color:var(--orange);color:var(--orange)}
+
+/* ── MAPA ── */
+.map-layout{display:grid;grid-template-columns:360px 1fr;height:calc(100vh - 56px)}
+.map-sidebar{overflow-y:auto;border-right:0.5px solid var(--g2);background:var(--white)}
+.map-sidebar::-webkit-scrollbar{width:4px}
+.map-sidebar::-webkit-scrollbar-thumb{background:var(--g2);border-radius:2px}
+.map-sidebar-header{
+  padding:14px 16px;border-bottom:0.5px solid var(--g2);
+  position:sticky;top:0;background:var(--white);z-index:10;
+}
+.map-search-row{display:flex;gap:8px;margin-bottom:10px}
+.map-input{
+  flex:1;background:var(--g1);border:0.5px solid var(--g2);
+  border-radius:var(--rsm);padding:9px 12px;font-size:13px;color:var(--text);outline:none;
+}
+.map-input:focus{border-color:var(--orange)}
+.map-search-btn{
+  padding:9px 16px;background:var(--orange);color:white;border:none;
+  border-radius:var(--rsm);font-size:13px;font-weight:600;
+}
+.map-stats{font-size:12px;color:var(--textl);margin-bottom:10px}
+.map-stats strong{color:var(--text)}
+.osm-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(29,158,117,0.1);color:#0F6E56;
+  font-size:10px;font-weight:500;padding:3px 8px;border-radius:20px;
+}
+.osm-dot{width:7px;height:7px;border-radius:50%;background:#1D9E75}
+.map-filter-row{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.map-filter-row::-webkit-scrollbar{display:none}
+.map-list{padding:10px;display:flex;flex-direction:column;gap:6px}
+.map-item{
+  display:flex;align-items:center;gap:10px;padding:10px;
+  border-radius:var(--rsm);border:0.5px solid var(--g2);background:var(--white);
+  cursor:pointer;transition:all 0.15s;
+}
+.map-item:hover,.map-item.active{border-color:var(--orange);background:rgba(232,98,42,0.03)}
+.map-emoji{width:42px;height:42px;border-radius:var(--rsm);background:var(--g1);display:flex;align-items:center;justify-content:center;font-size:10px;color:transparent;flex-shrink:0}
+.map-item-name{font-size:13px;font-weight:600;color:var(--text)}
+.map-item-sub{font-size:11px;color:var(--textl)}
+.map-item-dist{margin-left:auto;font-size:11px;color:var(--orange);font-weight:500;flex-shrink:0}
+#leaflet-map{width:100%;height:100%}
+.map-wrap{position:relative}
+.map-loading{
+  position:absolute;top:10px;right:10px;background:var(--white);
+  display:none;align-items:center;justify-content:center;z-index:500;
+  gap:8px;padding:6px 12px;border-radius:20px;box-shadow:var(--shadow2);
+}
+.map-loading.show{display:flex}
+.map-loading .spinner{width:16px;height:16px;border-width:2px}
+.spinner{width:32px;height:32px;border:3px solid var(--g2);border-top-color:var(--orange);border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.map-empty{padding:32px 16px;text-align:center}
+.map-empty-icon{font-size:36px;margin-bottom:10px}
+.map-empty-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px}
+.map-empty-sub{font-size:12px;color:var(--textl);line-height:1.6}
+
+/* ── TENDENCIAS ── */
+.trending-hero{
+  background:var(--bg);padding:32px 24px 0;border-bottom:1px solid var(--g2);
+}
+.trending-title{font-family:var(--serif);font-size:30px;font-weight:700;color:var(--text);margin-bottom:6px}
+.trending-sub{font-size:13px;color:var(--textl);margin-bottom:20px}
+.trending-tabs{display:flex;gap:0;border-bottom:1px solid var(--g2)}
+.trend-tab{
+  padding:10px 18px;font-size:13px;font-weight:500;color:var(--textl);
+  background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all 0.15s;
+}
+.trend-tab.active{color:var(--text);border-bottom-color:var(--orange)}
+.trending-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:0;
+  padding:24px;gap:14px;
+}
+.trend-card{
+  background:var(--white);border-radius:16px;overflow:hidden;
+  border:1px solid var(--g2);box-shadow:var(--shadow);cursor:pointer;transition:all 0.2s;
+}
+.trend-card:hover{box-shadow:var(--shadow2);transform:translateY(-3px)}
+.trend-img{
+  height:180px;background:var(--g1);position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;font-size:11px;color:transparent;
+}
+.trend-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(15,27,45,0.9) 0%,transparent 50%)}
+.trend-content{position:absolute;bottom:0;left:0;right:0;padding:12px}
+.trend-creator{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.trend-avatar{width:22px;height:22px;border-radius:50%;background:var(--orange);font-size:10px;font-weight:600;color:white;display:flex;align-items:center;justify-content:center;border:1.5px solid rgba(255,255,255,0.3)}
+.trend-handle{font-size:11px;color:rgba(255,255,255,0.8);font-weight:500}
+.trend-name{font-size:14px;font-weight:700;color:white;margin-bottom:2px}
+.trend-loc{font-size:11px;color:rgba(255,255,255,0.6)}
+.trend-stats{display:flex;align-items:center;gap:12px;position:absolute;top:10px;right:10px}
+.trend-stat{display:flex;align-items:center;gap:3px;color:white;font-size:11px;font-weight:500}
+.trend-body{padding:12px}
+.trend-desc{font-size:12px;color:var(--textm);line-height:1.5}
+
+/* ── LISTAS ── */
+.lists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;padding:24px}
+.list-card{
+  background:var(--white);border-radius:16px;padding:20px;
+  border:1px solid var(--g2);box-shadow:var(--shadow);cursor:pointer;transition:all 0.2s;
+  display:flex;align-items:center;gap:14px;
+}
+.list-card:hover{box-shadow:var(--shadow2);border-color:var(--orange);transform:translateY(-2px)}
+.list-emoji-wrap{width:52px;height:52px;border-radius:14px;background:var(--g1);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+.list-info-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px}
+.list-info-sub{font-size:12px;color:var(--textl)}
+.list-arrow{margin-left:auto;color:var(--textl);font-size:18px;flex-shrink:0}
+
+/* ── IA CHEF ── */
+.ia-page{max-width:680px;margin:0 auto;padding:40px 24px}
+.ia-icon{width:64px;height:64px;border-radius:16px;background:rgba(232,98,42,0.1);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:30px}
+.ia-title{font-family:var(--serif);font-size:30px;font-weight:700;color:var(--text);text-align:center;margin-bottom:6px}
+.ia-sub{font-size:14px;color:var(--textl);text-align:center;margin-bottom:32px;line-height:1.6}
+.ia-form{background:var(--white);border-radius:20px;padding:28px;border:1px solid var(--g2);box-shadow:var(--shadow)}
+.ia-field{margin-bottom:20px}
+.ia-label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
+.ia-input{width:100%;padding:11px 14px;border:0.5px solid var(--g2);border-radius:var(--rsm);font-size:14px;color:var(--text);background:var(--g1);outline:none;transition:border-color 0.2s}
+.ia-input:focus{border-color:var(--orange);background:white}
+.chips-select{display:flex;gap:6px;flex-wrap:wrap}
+.chip-opt{
+  padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;
+  background:var(--g1);border:0.5px solid var(--g2);color:var(--textm);transition:all 0.15s;
+}
+.chip-opt.selected{background:var(--orange);color:white;border-color:var(--orange)}
+.chip-opt:hover:not(.selected){border-color:var(--orange);color:var(--orange)}
+.btn-ia{
+  width:100%;padding:14px;background:var(--orange);color:white;border:none;
+  border-radius:var(--rsm);font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:background 0.2s;margin-top:4px;
+}
+.btn-ia:hover:not(:disabled){background:var(--orange2)}
+.btn-ia:disabled{opacity:0.55;cursor:not-allowed}
+.ia-results{margin-top:24px;display:flex;flex-direction:column;gap:12px}
+.ia-rest-card{
+  display:flex;align-items:center;gap:12px;padding:14px;
+  background:var(--white);border-radius:var(--rsm);border:0.5px solid var(--g2);box-shadow:var(--shadow);
+}
+.ia-rest-emoji{width:48px;height:48px;border-radius:var(--rsm);background:var(--g1);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.ia-rest-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px}
+.ia-rest-sub{font-size:12px;color:var(--textl)}
+.ia-rest-score{margin-left:auto;font-size:13px;font-weight:700;color:var(--gold);flex-shrink:0}
+.ia-prose{font-size:14px;color:var(--textm);line-height:1.7;padding:16px;background:var(--g1);border-radius:var(--rsm)}
+
+/* ── GASTROBOT ── */
+.bot-layout{display:grid;grid-template-columns:240px 1fr;height:calc(100vh - 56px)}
+.bot-sidebar{background:var(--white);border-right:0.5px solid var(--g2);padding:16px;overflow-y:auto}
+.bot-new-btn{
+  width:100%;padding:10px;background:var(--orange);color:white;border:none;
+  border-radius:var(--rsm);font-size:13px;font-weight:600;margin-bottom:16px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.bot-history-item{
+  padding:9px 10px;border-radius:var(--rsm);font-size:13px;color:var(--textm);
+  cursor:pointer;margin-bottom:2px;transition:all 0.15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.bot-history-item:hover,.bot-history-item.active{background:var(--g1);color:var(--text)}
+.bot-main{display:flex;flex-direction:column;height:calc(100vh - 56px)}
+.bot-header{
+  padding:14px 20px;border-bottom:0.5px solid var(--g2);
+  display:flex;align-items:center;gap:12px;background:var(--white);
+}
+.bot-avatar{width:36px;height:36px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:18px}
+.bot-name{font-size:14px;font-weight:600;color:var(--text)}
+.bot-status{font-size:11px;color:var(--textl);display:flex;align-items:center;gap:4px}
+.bot-online{width:7px;height:7px;border-radius:50%;background:#1D9E75}
+.bot-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;background:var(--bg)}
+.bot-messages::-webkit-scrollbar{width:4px}
+.bot-messages::-webkit-scrollbar-thumb{background:var(--g2);border-radius:2px}
+.bot-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;text-align:center;padding:40px}
+.bot-empty-icon{width:64px;height:64px;border-radius:16px;background:rgba(232,98,42,0.1);display:flex;align-items:center;justify-content:center;font-size:28px}
+.bot-empty-title{font-size:16px;font-weight:600;color:var(--text)}
+.bot-empty-sub{font-size:13px;color:var(--textl);line-height:1.6;max-width:360px}
+.bot-suggestions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+.bot-sugg{padding:8px 14px;border-radius:20px;font-size:12px;background:var(--white);border:0.5px solid var(--g2);color:var(--textm);cursor:pointer;transition:all 0.15s}
+.bot-sugg:hover{border-color:var(--orange);color:var(--orange)}
+.msg-row{display:flex;gap:10px;align-items:flex-start}
+.msg-row.user{flex-direction:row-reverse}
+.msg-ava{width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600}
+.msg-ava.bot{background:var(--orange);color:white}
+.msg-ava.user{background:var(--navy);color:white}
+.msg-bubble{max-width:72%;padding:12px 14px;border-radius:16px;font-size:13px;line-height:1.6}
+.msg-bubble.bot{background:var(--white);border:0.5px solid var(--g2);border-radius:4px 16px 16px 16px;color:var(--text)}
+.msg-bubble.user{background:var(--navy);color:white;border-radius:16px 16px 4px 16px}
+.msg-typing{display:flex;gap:4px;padding:14px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--g3);animation:bounce 1.2s infinite}
+.dot:nth-child(2){animation-delay:0.2s}
+.dot:nth-child(3){animation-delay:0.4s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+.bot-input-bar{
+  padding:14px 20px;border-top:0.5px solid var(--g2);background:var(--white);
+  display:flex;align-items:center;gap:10px;
+}
+.bot-input{
+  flex:1;padding:11px 16px;border:0.5px solid var(--g2);border-radius:var(--rsm);
+  font-size:13px;color:var(--text);background:var(--g1);outline:none;
+  transition:border-color 0.2s;
+}
+.bot-input:focus{border-color:var(--orange);background:white}
+.bot-send{
+  width:38px;height:38px;border-radius:var(--rsm);background:var(--orange);
+  border:none;display:flex;align-items:center;justify-content:center;font-size:17px;
+  flex-shrink:0;transition:background 0.15s;
+}
+.bot-send:hover:not(:disabled){background:var(--orange2)}
+.bot-send:disabled{opacity:0.5;cursor:not-allowed}
+
+/* ── CREADORES ── */
+.creators-header{background:var(--bg);padding:32px 24px;border-bottom:1px solid var(--g2)}
+.creators-title{font-family:var(--serif);font-size:30px;font-weight:700;color:var(--text);margin-bottom:6px}
+.creators-sub{font-size:13px;color:var(--textl);margin-bottom:20px}
+.creators-search{
+  max-width:440px;display:flex;align-items:center;gap:10px;
+  background:var(--white);border:1px solid var(--g2);
+  border-radius:var(--rsm);padding:10px 14px;
+}
+.creators-search input{background:none;border:none;color:var(--text);font-size:13px;flex:1;outline:none}
+.creators-search input::placeholder{color:var(--textl)}
+.creators-level-tabs{display:flex;gap:10px;padding:20px 24px;overflow-x:auto;scrollbar-width:none;background:var(--white);border-bottom:0.5px solid var(--g2)}
+.creators-level-tabs::-webkit-scrollbar{display:none}
+.level-tab{
+  flex-shrink:0;padding:8px 16px;border-radius:var(--rsm);font-size:12px;font-weight:600;
+  background:var(--g1);border:0.5px solid var(--g2);color:var(--textm);cursor:pointer;
+  display:flex;align-items:center;gap:6px;transition:all 0.15s;
+}
+.level-tab.active{background:var(--orange);color:white;border-color:var(--orange)}
+.creators-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;padding:24px}
+.creator-card{
+  background:var(--white);border-radius:16px;padding:20px;
+  border:1px solid var(--g2);box-shadow:var(--shadow);cursor:pointer;transition:all 0.2s;
+}
+.creator-card:hover{box-shadow:var(--shadow2);border-color:var(--orange);transform:translateY(-2px)}
+.creator-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.creator-ava{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:white;flex-shrink:0;border:2px solid var(--g2)}
+.creator-name{font-family:var(--serif);font-size:16px;font-weight:700;color:var(--text)}
+.creator-handle{font-size:12px;color:var(--textl)}
+.creator-level-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px;margin-top:3px}
+.level-foodie{background:var(--g1);color:var(--textm)}
+.level-pro{background:rgba(224,153,92,0.15);color:var(--orange)}
+.level-expert{background:rgba(74,144,226,0.12);color:#3E7BC4}
+.level-critic{background:var(--purple-bg);color:var(--purple)}
+.creator-bio{font-size:12px;color:var(--textm);line-height:1.5;margin-bottom:12px}
+.creator-stats-row{display:flex;gap:16px}
+.cstat{text-align:center}
+.cstat-num{font-size:15px;font-weight:700;color:var(--text)}
+.cstat-lbl{font-size:10px;color:var(--textl)}
+.creator-cities{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.city-tag{font-size:10px;padding:2px 8px;border-radius:20px;background:var(--g1);color:var(--textm)}
+.follow-btn{
+  margin-top:12px;width:100%;padding:9px;background:var(--orange);color:white;
+  border:none;border-radius:var(--rsm);font-size:12px;font-weight:600;transition:background 0.15s;
+}
+.follow-btn:hover{background:var(--orange2)}
+.follow-btn.following{background:var(--g1);color:var(--text);border:0.5px solid var(--g2)}
+
+/* ── FAVORITOS ── */
+.favs-page{max-width:680px;margin:0 auto;padding:32px 24px}
+.favs-title{font-size:24px;font-weight:700;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.favs-sub{font-size:13px;color:var(--textl);margin-bottom:24px}
+.fav-item{
+  display:flex;align-items:center;gap:12px;padding:14px;
+  background:var(--white);border-radius:var(--rsm);border:0.5px solid var(--g2);
+  margin-bottom:8px;cursor:pointer;transition:all 0.15s;
+}
+.fav-item:hover{border-color:var(--orange)}
+.fav-heart{color:var(--orange);font-size:18px;flex-shrink:0}
+.fav-info{flex:1}
+.fav-name{font-size:14px;font-weight:600;color:var(--text)}
+.fav-city{font-size:12px;color:var(--textl)}
+.fav-del{background:none;border:none;color:var(--textl);font-size:16px;transition:color 0.15s}
+.fav-del:hover{color:#E24B4A}
+.favs-empty{text-align:center;padding:60px 20px}
+.favs-empty-icon{font-size:48px;margin-bottom:16px}
+
+/* ── VIAJERO ── */
+.viajero-page{max-width:680px;margin:0 auto;padding:40px 24px}
+.viajero-icon{width:64px;height:64px;border-radius:16px;background:rgba(232,98,42,0.1);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:30px}
+.viajero-title{font-family:var(--serif);font-size:30px;font-weight:700;color:var(--text);text-align:center;margin-bottom:6px}
+.viajero-sub{font-size:14px;color:var(--textl);text-align:center;margin-bottom:32px;line-height:1.6}
+.viajero-form{background:var(--white);border-radius:20px;padding:28px;border:1px solid var(--g2);box-shadow:var(--shadow)}
+.viajero-row{display:grid;grid-template-columns:1fr 120px;gap:12px;margin-bottom:20px}
+.viajero-plan{margin-top:24px;display:flex;flex-direction:column;gap:14px}
+.day-card{background:var(--white);border-radius:16px;border:1px solid var(--g2);overflow:hidden;box-shadow:var(--shadow)}
+.day-header{background:var(--g1);padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--g2)}
+.day-num{font-size:13px;font-weight:700;color:var(--orange)}
+.day-title{font-family:var(--serif);font-size:15px;font-weight:700;color:var(--text)}
+.day-body{padding:16px;display:flex;flex-direction:column;gap:10px}
+.meal-row{display:flex;gap:10px}
+.meal-icon{font-size:18px;width:32px;text-align:center;flex-shrink:0;padding-top:1px}
+.meal-content{flex:1}
+.meal-label{font-size:10px;font-weight:600;color:var(--textl);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px}
+.meal-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.meal-desc{font-size:12px;color:var(--textm);line-height:1.5}
+.meal-price{font-size:11px;color:var(--orange);font-weight:500;margin-top:2px}
+
+/* ── PERFIL ── */
+.profile-hero{background:var(--bg);padding:32px 24px;text-align:center;border-bottom:1px solid var(--g2)}
+.profile-ava{width:72px;height:72px;border-radius:50%;background:rgba(224,153,92,0.15);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:var(--orange);border:3px solid var(--g2)}
+.profile-name{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--text);margin-bottom:4px}
+.profile-email{font-size:13px;color:var(--textl);margin-bottom:14px}
+.profile-level-badge{display:inline-flex;align-items:center;gap:6px;background:var(--purple-bg);color:var(--purple);font-size:12px;font-weight:600;padding:5px 14px;border-radius:20px;border:0.5px solid rgba(139,127,224,0.25)}
+.profile-stats-row{display:flex;justify-content:center;gap:28px;margin-top:20px}
+.pstat{text-align:center}
+.pstat-num{font-size:20px;font-weight:700;color:var(--text)}
+.pstat-lbl{font-size:11px;color:var(--textl)}
+.profile-nav{display:flex;background:var(--white);border-bottom:0.5px solid var(--g2)}
+.profile-nav-item{flex:1;padding:13px;text-align:center;font-size:13px;font-weight:500;color:var(--textl);background:none;border:none;border-bottom:2px solid transparent;transition:all 0.15s;cursor:pointer}
+.profile-nav-item.active{color:var(--text);border-bottom-color:var(--orange)}
+.profile-body{padding:24px;max-width:720px;margin:0 auto}
+.rep-card{background:var(--white);border-radius:var(--r);padding:20px;border:0.5px solid var(--g2);box-shadow:var(--shadow);margin-bottom:16px}
+.rep-header{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:15px;font-weight:700;color:var(--text)}
+.rep-progress{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--textl);margin-bottom:6px}
+.progress-bar{height:8px;background:var(--g1);border-radius:4px;overflow:hidden;margin-bottom:14px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--orange),var(--orange2));border-radius:4px;transition:width 0.6s}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.stat-cell{background:var(--g1);border-radius:var(--rsm);padding:14px;text-align:center}
+.stat-cell-num{font-size:22px;font-weight:700;color:var(--orange)}
+.stat-cell-lbl{font-size:11px;color:var(--textl)}
+.how-to{font-size:12px;font-weight:600;color:var(--textm);margin-bottom:8px}
+.earn-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--textm);margin-bottom:5px}
+.level-list{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.level-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--rsm);background:var(--g1);border:0.5px solid transparent}
+.level-row.current{background:rgba(232,98,42,0.06);border-color:rgba(232,98,42,0.2)}
+.level-icon{font-size:18px;width:28px;text-align:center}
+.level-name{font-size:13px;font-weight:600;color:var(--text);flex:1}
+.level-pts{font-size:11px;color:var(--textl)}
+.current-badge{font-size:10px;background:var(--orange);color:white;padding:2px 8px;border-radius:20px;font-weight:600}
+
+/* ── RANKING LIST ── */
+.rank-list{display:flex;flex-direction:column;gap:8px;padding:0 24px 24px}
+.rank-row{
+  display:flex;align-items:center;gap:12px;padding:14px;
+  background:var(--white);border-radius:var(--r);border:0.5px solid var(--g2);
+  box-shadow:var(--shadow);cursor:pointer;transition:all 0.15s;
+}
+.rank-row:hover{border-color:var(--orange);transform:translateX(3px)}
+.rank-num{font-size:20px;font-weight:700;color:var(--g3);min-width:32px;text-align:center}
+.rank-num.top{color:var(--gold)}
+.rank-emoji{width:52px;height:52px;border-radius:var(--rsm);background:var(--g1);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+.rank-info{flex:1;min-width:0}
+.rank-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px}
+.rank-sub{font-size:12px;color:var(--textl);margin-bottom:6px}
+.rank-meta{display:flex;align-items:center;gap:8px}
+.rank-score{font-size:12px;font-weight:600;color:var(--gold);display:flex;align-items:center;gap:3px}
+.rank-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.trend-up{font-size:11px;background:rgba(29,158,117,0.1);color:#0F6E56;padding:2px 7px;border-radius:20px;font-weight:500}
+.trend-hot{font-size:11px;background:rgba(232,98,42,0.1);color:var(--orange);padding:2px 7px;border-radius:20px;font-weight:500}
+
+/* ── UTILS ── */
+.empty-state{text-align:center;padding:48px 24px}
+.empty-icon{font-size:44px;margin-bottom:14px}
+.empty-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px}
+.empty-sub{font-size:13px;color:var(--textl);line-height:1.6;max-width:360px;margin:0 auto}
+.loading-text{font-size:13px;color:var(--textl);text-align:center;padding:24px}
+.inline-loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:24px;color:var(--textl);font-size:13px}
+
+/* ── FICHA DE RESTAURANTE ── */
+.detail-page{max-width:1120px;margin:0 auto;padding:24px}
+.detail-back{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--textl);cursor:pointer;margin-bottom:16px;background:none;border:none;font-family:inherit}
+.detail-back:hover{color:var(--text)}
+.detail-layout{display:grid;grid-template-columns:1fr 300px;gap:24px}
+@media(max-width:900px){.detail-layout{grid-template-columns:1fr}}
+.detail-hero{position:relative;border-radius:18px;overflow:hidden;height:340px;background:var(--g1)}
+.detail-hero img{width:100%;height:100%;object-fit:cover}
+.detail-hero-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.65) 0%,rgba(0,0,0,0.05) 55%,transparent 70%)}
+.detail-hero-text{position:absolute;left:24px;right:90px;bottom:18px;color:white}
+.detail-hero-text h1{font-family:var(--serif);font-size:32px;font-weight:700;margin-bottom:6px}
+.detail-hero-addr{font-size:13px;color:rgba(255,255,255,0.85);display:flex;align-items:center;gap:5px}
+.detail-hero-score{position:absolute;bottom:18px;right:18px;width:58px;height:58px;border-radius:14px;background:var(--gold);color:white;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700}
+.detail-meta-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:18px 0 16px}
+.detail-rating{display:flex;align-items:center;gap:5px;font-size:15px;font-weight:700;color:var(--text)}
+.detail-rating span{font-weight:400;color:var(--textl);font-size:13px}
+.detail-actions{display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap}
+.detail-btn{display:inline-flex;align-items:center;gap:7px;padding:11px 20px;border-radius:var(--rsm);font-size:13px;font-weight:600;transition:all 0.15s;text-decoration:none;border:1px solid var(--g2);color:var(--text);background:var(--white)}
+.detail-btn.primary{background:var(--orange);color:white;border-color:var(--orange)}
+.detail-btn.primary:hover{background:var(--orange2)}
+.detail-btn:hover:not(.primary){border-color:var(--textl)}
+.detail-tabs{display:flex;gap:24px;border-bottom:1px solid var(--g2);margin-bottom:20px}
+.detail-tab{padding:10px 2px;font-size:13px;font-weight:600;color:var(--textl);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer}
+.detail-tab.active{color:var(--text);border-bottom-color:var(--orange)}
+.review-card{background:var(--white);border:1px solid var(--g2);border-radius:16px;padding:24px}
+.review-card h3{font-family:var(--serif);font-size:17px;margin-bottom:16px}
+.star-select{display:flex;gap:6px;font-size:24px;color:var(--g3);margin-bottom:16px;cursor:pointer}
+.star-select span:hover,.star-select span.hovered{color:var(--gold2)}
+.detail-info-list{display:flex;flex-direction:column;gap:12px;font-size:13px;color:var(--textm)}
+.detail-info-list div{display:flex;gap:8px}
+.score-card{background:var(--white);border:1px solid var(--g2);border-radius:16px;padding:20px;position:sticky;top:76px}
+.score-card h3{font-family:var(--serif);font-size:17px;margin-bottom:14px}
+.score-header{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.score-badge-lg{width:56px;height:56px;border-radius:14px;background:var(--gold);color:white;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0}
+.score-bar-row{margin-bottom:14px}
+.score-bar-label{display:flex;justify-content:space-between;font-size:12px;color:var(--textm);margin-bottom:6px}
+.score-bar-track{height:6px;background:var(--g1);border-radius:3px;overflow:hidden}
+.score-bar-fill{height:100%;background:var(--orange);border-radius:3px}
+.score-note{font-size:11px;color:var(--textl);line-height:1.6;margin-top:10px;padding-top:14px;border-top:1px solid var(--g2)}
+
+/* Tooltip de nombre+puntuación al pasar el ratón/tocar un marcador del mapa */
+.leaflet-tooltip.restaurant-tooltip{
+  background:var(--white);color:var(--text);border:1px solid var(--g2);
+  border-radius:8px;box-shadow:var(--shadow2);
+  font-family:'Inter',sans-serif;font-size:12px;font-weight:600;
+  padding:6px 11px;
+}
+.leaflet-tooltip.restaurant-tooltip::before{border-top-color:var(--white)}
+
+@media(max-width:768px){
+  .map-layout{grid-template-columns:1fr;grid-template-rows:50vh auto}
+  #leaflet-map{height:50vh}
+  .bot-layout{grid-template-columns:1fr}
+  .bot-sidebar{display:none}
+  .hero h1{font-size:28px}
+  .cards-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">
+    <img class="logo-icon" src="data:image/png;base64,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" alt="GastroMap">
+    <div class="logo-text">GastroMap <span>AI</span></div>
+  </div>
+  <div class="nav-links">
+    <button class="nav-link active" onclick="showPage('explorar')"><span class="icon">🔍</span> <span data-i18n="nav_explorar">Explorar</span></button>
+    <button class="nav-link" onclick="showPage('mapa')"><span class="icon">🗺</span> <span data-i18n="nav_mapa">Mapa</span></button>
+    <button class="nav-link" onclick="showPage('tendencias')"><span class="icon">📈</span> <span data-i18n="nav_tendencias">Tendencias</span></button>
+    <button class="nav-link" onclick="showPage('listas')"><span class="icon">☰</span> <span data-i18n="nav_listas">Listas</span></button>
+    <button class="nav-link" onclick="showPage('ia')"><span class="icon">✨</span> <span data-i18n="nav_ia">IA Chef</span></button>
+    <button class="nav-link" onclick="showPage('creadores')"><span class="icon">🌐</span> <span data-i18n="nav_creadores">Creadores</span></button>
+    <button class="nav-link" onclick="showPage('viajero')"><span class="icon">✈️</span> <span data-i18n="nav_viajero">Viajero</span></button>
+    <button class="nav-link" onclick="showPage('gastrobot')"><span class="icon">🤖</span> <span data-i18n="nav_gastrobot">GastroBot</span></button>
+    <button class="nav-link" onclick="showPage('ajustes')"><span class="icon">⚙️</span> <span data-i18n="nav_ajustes">Ajustes</span></button>
+    <button class="nav-link" onclick="showPage('perfil')"><span class="icon">👤</span> <span data-i18n="nav_perfil">Perfil</span></button>
+  </div>
+  <div class="nav-right">
+    <div class="nav-avatar">M</div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════ EXPLORAR ═══════════════════════════════ -->
+<div id="page-explorar" class="page active">
+  <div class="hero">
+    <div class="hero-tag">✨ Powered by OpenStreetMap · sin Google</div>
+    <h1>Descubre los <em>mejores</em><br>restaurantes</h1>
+    <p>Ranking inteligente con datos reales, críticos verificados y comunidad gastronómica</p>
+    <div class="search-box">
+      <input id="hero-search" placeholder="Busca una ciudad… Valencia, Tokyo, Miami…" onkeydown="if(event.key==='Enter')heroSearch()">
+      <button class="btn-search" onclick="heroSearch()">Buscar</button>
+    </div>
+    <div class="city-chips" id="hero-chips">
+      <button class="city-chip" onclick="setHeroCity('Valencia')">🍊 Valencia</button>
+      <button class="city-chip" onclick="setHeroCity('Madrid')">🏟 Madrid</button>
+      <button class="city-chip" onclick="setHeroCity('Barcelona')">🏖 Barcelona</button>
+      <button class="city-chip" onclick="setHeroCity('Paris')">🥐 Paris</button>
+      <button class="city-chip" onclick="setHeroCity('Tokyo')">🍣 Tokyo</button>
+      <button class="city-chip" onclick="setHeroCity('New York')">🗽 New York</button>
+      <button class="city-chip" onclick="setHeroCity('Roma')">🍕 Roma</button>
+      <button class="city-chip" onclick="setHeroCity('Miami')">🌴 Miami</button>
+    </div>
+  </div>
+  <div class="filter-bar" id="explorar-filters" style="display:none">
+    <button class="filter-btn active" onclick="explorarFiltrar(this,'todos')">✦ Global Score</button>
+    <button class="filter-btn" onclick="explorarFiltrar(this,'restaurant')">🍽 Restaurantes</button>
+    <button class="filter-btn" onclick="explorarFiltrar(this,'cafe')">☕ Cafés</button>
+    <button class="filter-btn" onclick="explorarFiltrar(this,'bar')">🍷 Bares</button>
+    <button class="filter-btn" onclick="explorarFiltrar(this,'fast_food')">🍔 Fast Food</button>
+    <button class="filter-btn" onclick="explorarFiltrar(this,'bakery')">🥐 Panaderías</button>
+  </div>
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title" id="explorar-section-title">Top <em>GastroMap</em></div>
+      <div class="see-all" id="explorar-count"></div>
+    </div>
+    <div id="explorar-results">
+      <div class="empty-state">
+        <div class="empty-icon">🌍</div>
+        <div class="empty-title">Busca cualquier ciudad del mundo</div>
+        <div class="empty-sub">Datos reales de OpenStreetMap — restaurantes, cafés, bares y más en cualquier ciudad, sin coste.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ MAPA ═══════════════════════════════ -->
+<div id="page-mapa" class="page">
+  <div class="map-layout">
+    <div class="map-sidebar">
+      <div class="map-sidebar-header">
+        <div class="map-search-row">
+          <input class="map-input" id="map-city-input" placeholder="Ciudad, o un plato: tapas, sushi, paella…" onkeydown="if(event.key==='Enter')mapSearch()">
+          <button class="map-search-btn" onclick="mapSearch()">Buscar</button>
+        </div>
+        <div class="map-stats" id="map-stats">Mueve o acerca el mapa — los restaurantes se cargan solos</div>
+        <div class="map-filter-row" id="map-filters" style="display:none">
+          <button class="filter-btn active" style="font-size:11px;padding:5px 10px" onclick="mapFiltrar(this,'todos')">Todos</button>
+          <button class="filter-btn" style="font-size:11px;padding:5px 10px" onclick="mapFiltrar(this,'restaurant')">Restaurantes</button>
+          <button class="filter-btn" style="font-size:11px;padding:5px 10px" onclick="mapFiltrar(this,'cafe')">Cafés</button>
+          <button class="filter-btn" style="font-size:11px;padding:5px 10px" onclick="mapFiltrar(this,'bar')">Bares</button>
+          <button class="filter-btn" style="font-size:11px;padding:5px 10px" onclick="mapFiltrar(this,'bakery')">Panaderías</button>
+        </div>
+        <select id="map-cuisine-filter" class="map-input" style="display:none;margin-top:8px" onchange="mapFiltrarCocina(this.value)">
+          <option value="Todas">Todas las cocinas</option>
+        </select>
+      </div>
+      <div class="map-list" id="map-list">
+        <div class="map-empty">
+          <div class="map-empty-icon">🌍</div>
+          <div class="map-empty-title">Explora el mapa del mundo</div>
+          <div class="map-empty-sub">Mueve y acerca el mapa a cualquier ciudad — los restaurantes reales de OpenStreetMap se cargan automáticamente.</div>
+        </div>
+      </div>
+    </div>
+    <div class="map-wrap">
+      <div id="leaflet-map"></div>
+      <div class="map-loading" id="map-loading">
+        <div class="spinner"></div>
+        <div style="font-size:12px;color:var(--textm);white-space:nowrap">Actualizando…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ TENDENCIAS ═══════════════════════════════ -->
+<div id="page-tendencias" class="page">
+  <div class="trending-hero">
+    <div class="trending-title">🔥 Tendencias</div>
+    <div class="trending-sub">Restaurantes virales, en alza y los más populares del momento</div>
+    <div class="trending-tabs">
+      <button class="trend-tab active" onclick="trendTab(this,'parati')">Para ti</button>
+      <button class="trend-tab" onclick="trendTab(this,'trending')">Trending</button>
+      <button class="trend-tab" onclick="trendTab(this,'platos')">Platos virales</button>
+      <button class="trend-tab" onclick="trendTab(this,'nuevas')">Nuevas aperturas</button>
+      <button class="trend-tab" onclick="trendTab(this,'guardados')">Más guardados</button>
+    </div>
+  </div>
+  <div class="trending-grid" id="trending-grid"></div>
+</div>
+
+<!-- ═══════════════════════════════ LISTAS ═══════════════════════════════ -->
+<div id="page-listas" class="page">
+  <div style="background:var(--bg);padding:28px 24px;border-bottom:1px solid var(--g2)">
+    <div style="font-family:var(--serif);font-size:28px;font-weight:700;color:var(--text);margin-bottom:4px">☰ Listas Temáticas</div>
+    <div style="font-size:13px;color:var(--textl);margin-bottom:16px">Colecciones curadas de los mejores restaurantes por categoría</div>
+    <div style="position:relative;max-width:420px">
+      <input id="lists-search" type="text" placeholder="Busca por plato o ciudad: hamburguesa, Sevilla…" oninput="filterLists(this.value)"
+        style="width:100%;padding:11px 16px;border:1px solid var(--g2);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;background:var(--white)">
+    </div>
+  </div>
+  <div style="padding:16px 24px 8px;font-size:13px;font-weight:700;color:var(--textm)" id="lists-section-label">Populares</div>
+  <div class="lists-grid" id="lists-grid"></div>
+</div>
+
+<!-- ═══════════════════════════════ IA CHEF ═══════════════════════════════ -->
+<div id="page-ia" class="page">
+  <div class="ia-page">
+    <div class="ia-icon">✨</div>
+    <div class="ia-title">IA Chef Personal</div>
+    <div class="ia-sub">Cuéntame tus preferencias y encontraré el restaurante perfecto para ti</div>
+    <div class="ia-form">
+      <div class="ia-field">
+        <div class="ia-label">📍 ¿En qué ciudad?</div>
+        <input class="ia-input" id="ia-city" placeholder="Valencia, Madrid, Tokyo…">
+      </div>
+      <div class="ia-field">
+        <div class="ia-label">€ Presupuesto por persona: <span id="ia-budget-label" style="color:var(--orange)">50€</span></div>
+        <input type="range" id="ia-budget" min="10" max="300" value="50" style="width:100%;accent-color:var(--orange)" oninput="document.getElementById('ia-budget-label').textContent=this.value+'€'">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--textl);margin-top:4px"><span>10€</span><span>150€</span><span>300€</span></div>
+      </div>
+      <div class="ia-field">
+        <div class="ia-label">🍽 Tipo de cocina</div>
+        <div class="chips-select" id="ia-cuisine">
+          <button class="chip-opt" onclick="toggleChip(this)">Italiana</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Japonesa</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Mediterránea</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Mexicana</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Francesa</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Asiática</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Americana</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Tapas</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Parrilla</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Sushi</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Vegetariana</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Pizza</button>
+        </div>
+      </div>
+      <div class="ia-field">
+        <div class="ia-label">♥ Ocasión</div>
+        <div class="chips-select" id="ia-ocasion">
+          <button class="chip-opt" onclick="toggleChip(this)">Cena romántica</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Comida de negocios</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Celebración</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Casual</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Familia</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Amigos</button>
+        </div>
+      </div>
+      <div class="ia-field">
+        <div class="ia-label">⚠️ Alergias o intolerancias</div>
+        <div class="chips-select" id="ia-alergias">
+          <button class="chip-opt" onclick="toggleChip(this)">Gluten</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Crustáceos</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Huevos</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Pescado</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Cacahuetes</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Soja</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Lácteos</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Frutos de cáscara</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Apio</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Mostaza</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Sésamo</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Sulfitos</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Altramuces</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Moluscos</button>
+        </div>
+        <div style="font-size:11px;color:var(--textl);margin-top:8px;line-height:1.5">⚠️ Orientativo. La IA no puede verificar la cocina de cada restaurante — para alergias graves, confirma siempre directamente con el local antes de ir.</div>
+      </div>
+      <button class="btn-ia" id="ia-btn" onclick="runIAChef()">✨ Obtener Recomendaciones</button>
+    </div>
+    <div id="ia-results"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ CREADORES ═══════════════════════════════ -->
+<div id="page-creadores" class="page">
+  <div class="creators-header">
+    <div class="creators-title">🌐 Creadores Gastronómicos</div>
+    <div class="creators-sub">Influencers, foodies y críticos verificados que comparten sus descubrimientos</div>
+    <div class="creators-search">
+      <span>🔍</span>
+      <input placeholder="Buscar creador, especialidad o ciudad…" oninput="filterCreators(this.value)">
+    </div>
+  </div>
+  <div class="creators-level-tabs">
+    <button class="level-tab active" onclick="filterCreatorLevel(this,'all')">⭐ Todos</button>
+    <button class="level-tab" onclick="filterCreatorLevel(this,'foodie')">🍴 Foodie</button>
+    <button class="level-tab" onclick="filterCreatorLevel(this,'foodie_pro')">🏅 Foodie Pro</button>
+    <button class="level-tab" onclick="filterCreatorLevel(this,'local_expert')">🌐 Experto Local</button>
+    <button class="level-tab" onclick="filterCreatorLevel(this,'verified_critic')">🛡 Crítico Verificado</button>
+  </div>
+  <div class="creators-grid" id="creators-grid"></div>
+</div>
+
+<!-- ═══════════════════════════════ FAVORITOS ═══════════════════════════════ -->
+<!-- ═══════════════════════════════ VIAJERO ═══════════════════════════════ -->
+<div id="page-viajero" class="page">
+  <div class="viajero-page">
+    <div class="viajero-icon">✈️</div>
+    <div class="viajero-title">Modo Viajero</div>
+    <div class="viajero-sub">Dime tu destino y cuántos días estarás.<br>Te creo un plan gastronómico completo con IA.</div>
+    <div class="viajero-form">
+      <div class="viajero-row">
+        <div class="ia-field" style="margin-bottom:0">
+          <div class="ia-label">📍 Ciudad</div>
+          <input class="ia-input" id="viajero-city" placeholder="Valencia, Tokyo, Paris…">
+        </div>
+        <div class="ia-field" style="margin-bottom:0">
+          <div class="ia-label">📅 Días</div>
+          <input class="ia-input" id="viajero-dias" type="number" min="1" max="30" value="3" step="1">
+        </div>
+      </div>
+      <div class="ia-field">
+        <div class="ia-label">🍽 Preferencias del viaje</div>
+        <div class="chips-select" id="viajero-preferencias">
+          <button class="chip-opt" onclick="toggleChip(this)">Lo más típico de la ciudad</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Alta cocina / gourmet</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Comida callejera</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Opciones económicas</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Sitios de locales, no turísticos</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Con encanto / históricos</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Instagrameables</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Mercados y puestos</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Vegetariano/Vegano friendly</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Maridaje de vinos</button>
+        </div>
+      </div>
+      <div class="ia-field">
+        <div class="ia-label">⚠️ Alergias o intolerancias</div>
+        <div class="chips-select" id="viajero-alergias">
+          <button class="chip-opt" onclick="toggleChip(this)">Gluten</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Crustáceos</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Huevos</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Pescado</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Cacahuetes</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Soja</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Lácteos</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Frutos de cáscara</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Apio</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Mostaza</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Sésamo</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Sulfitos</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Altramuces</button>
+          <button class="chip-opt" onclick="toggleChip(this)">Moluscos</button>
+        </div>
+        <div style="font-size:11px;color:var(--textl);margin-top:8px;line-height:1.5">⚠️ Orientativo. La IA no puede verificar la cocina de cada restaurante — para alergias graves, confirma siempre directamente con el local antes de ir.</div>
+      </div>
+      <button class="btn-ia" id="viajero-btn" onclick="runViajero()">✨ Generar Plan</button>
+    </div>
+    <div id="viajero-plan"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ GASTROBOT ═══════════════════════════════ -->
+<div id="page-gastrobot" class="page">
+  <div class="bot-layout">
+    <div class="bot-sidebar">
+      <button class="bot-new-btn" onclick="newBotChat()">+ Nueva consulta</button>
+      <div id="bot-history">
+        <div class="bot-history-item active">Nueva consulta</div>
+      </div>
+    </div>
+    <div class="bot-main">
+      <div class="bot-header">
+        <div class="bot-avatar">🍽</div>
+        <div>
+          <div class="bot-name">GastroBot</div>
+          <div class="bot-status"><div class="bot-online"></div> Asesor gastronómico IA</div>
+        </div>
+      </div>
+      <div class="bot-messages" id="bot-messages">
+        <div class="bot-empty" id="bot-empty">
+          <div class="bot-empty-icon">🍽</div>
+          <div class="bot-empty-title">GastroBot a tu servicio</div>
+          <div class="bot-empty-sub">Pregúntame sobre restaurantes, itinerarios gastronómicos o recomendaciones personalizadas</div>
+          <div class="bot-suggestions">
+            <button class="bot-sugg" onclick="sendBotSugg(this)">Mejores restaurantes en Valencia</button>
+            <button class="bot-sugg" onclick="sendBotSugg(this)">Itinerario 3 días en Tokyo</button>
+            <button class="bot-sugg" onclick="sendBotSugg(this)">Cena romántica en Madrid</button>
+            <button class="bot-sugg" onclick="sendBotSugg(this)">Recomiéndame sushi en Barcelona</button>
+          </div>
+        </div>
+      </div>
+      <div class="bot-input-bar">
+        <input class="bot-input" id="bot-input" placeholder="Pregunta sobre restaurantes…" onkeydown="if(event.key==='Enter'&&!event.shiftKey)sendBot()">
+        <button class="bot-send" id="bot-send" onclick="sendBot()">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ AJUSTES ═══════════════════════════════ -->
+<div id="page-ajustes" class="page">
+  <div style="max-width:640px;margin:0 auto;padding:32px 24px">
+    <div style="font-family:var(--serif);font-size:28px;font-weight:700;margin-bottom:4px" data-i18n="ajustes_title">⚙️ Ajustes</div>
+    <div style="font-size:13px;color:var(--textl);margin-bottom:24px" data-i18n="ajustes_sub">Gestiona tu perfil y tus preferencias</div>
+
+    <div class="rep-card" style="margin-bottom:16px">
+      <div class="rep-header">👤 <span data-i18n="ajustes_perfil">Perfil</span></div>
+      <div id="ajustes-auth-area"></div>
+    </div>
+
+    <div class="rep-card" style="margin-bottom:16px">
+      <div class="rep-header">⚠️ <span data-i18n="ajustes_alergias">Alergias e intolerancias por defecto</span></div>
+      <div style="font-size:11px;color:var(--textl);margin-bottom:12px" data-i18n="ajustes_alergias_note">Se autorrellenarán en IA Chef y Modo Viajero para que no tengas que marcarlas cada vez.</div>
+      <div class="chips-select" id="ajustes-alergias">
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Gluten</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Crustáceos</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Huevos</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Pescado</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Cacahuetes</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Soja</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Lácteos</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Frutos de cáscara</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Apio</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Mostaza</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Sésamo</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Sulfitos</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Altramuces</button>
+        <button class="chip-opt" onclick="toggleChip(this);saveDefaultAllergies()">Moluscos</button>
+      </div>
+    </div>
+
+    <div class="rep-card" style="margin-bottom:16px">
+      <div class="rep-header">🌐 <span data-i18n="ajustes_idioma">Idioma de la aplicación</span></div>
+      <div style="font-size:11px;color:var(--textl);margin-bottom:12px" data-i18n="ajustes_idioma_note">Traduce el menú y las pantallas principales. El contenido generado (búsquedas, IA, restaurantes) sigue en su idioma original por ahora.</div>
+      <select id="ajustes-idioma" onchange="setLanguage(this.value)"
+        style="width:100%;max-width:280px;padding:10px 14px;border:1px solid var(--g2);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;background:var(--white);color:var(--text)">
+        <option value="es">Español</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+
+    <div class="rep-card" style="margin-bottom:16px">
+      <div class="rep-header">🌙 <span data-i18n="ajustes_apariencia">Apariencia</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <div>
+          <div style="font-size:14px;font-weight:600" data-i18n="ajustes_modo_oscuro">Modo oscuro</div>
+          <div style="font-size:12px;color:var(--textl)" data-i18n="ajustes_modo_oscuro_sub">Cambia la interfaz a colores oscuros</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
+          <input type="checkbox" id="ajustes-dark-toggle" onchange="toggleDarkMode(this.checked)" style="opacity:0;width:0;height:0">
+          <span id="ajustes-dark-slider" style="position:absolute;inset:0;background:var(--g3);border-radius:24px;transition:0.2s;cursor:pointer"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="rep-card">
+      <div class="rep-header">🔐 <span data-i18n="ajustes_cuenta">Cuenta</span></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn-ia" style="background:var(--white);color:var(--text);border:1px solid var(--g2)" onclick="clearMyData()">🗑️ <span data-i18n="ajustes_borrar_datos">Borrar mis datos guardados</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ PERFIL ═══════════════════════════════ -->
+<div id="page-perfil" class="page">
+  <div class="profile-hero">
+    <div class="profile-ava" id="pfl-avatar">?</div>
+    <div class="profile-name" id="pfl-name">Sin iniciar sesión</div>
+    <div class="profile-email" id="pfl-email">Ve a Ajustes para crear tu cuenta</div>
+    <div class="profile-level-badge">🛡 Crítico Verificado</div>
+    <div class="profile-stats-row">
+      <div class="pstat"><div class="pstat-num" id="pstat-resenas">49</div><div class="pstat-lbl">Reseñas</div></div>
+      <div class="pstat"><div class="pstat-num" id="pstat-favs">0</div><div class="pstat-lbl">Favoritos</div></div>
+      <div class="pstat"><div class="pstat-num">500</div><div class="pstat-lbl">Puntos</div></div>
+    </div>
+  </div>
+  <div class="profile-nav">
+    <button class="profile-nav-item active" onclick="profileTab(this,'rep')">Reputación</button>
+    <button class="profile-nav-item" onclick="profileTab(this,'foodprint')">Foodprint</button>
+    <button class="profile-nav-item" onclick="profileTab(this,'favs')">Favoritos</button>
+    <button class="profile-nav-item" onclick="profileTab(this,'niveles')">Niveles</button>
+  </div>
+  <div class="profile-body">
+    <div id="profile-tab-rep">
+      <div class="rep-card">
+        <div class="rep-header">🏆 Sistema de Reputación</div>
+        <div class="rep-progress">
+          <span>Crítico Verificado</span><span>500 puntos</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+        <div class="stats-grid">
+          <div class="stat-cell"><div class="stat-cell-num" id="rep-resenas">49</div><div class="stat-cell-lbl">Reseñas</div></div>
+          <div class="stat-cell"><div class="stat-cell-num" id="rep-favs">0</div><div class="stat-cell-lbl">Favoritos</div></div>
+        </div>
+        <div class="how-to">Cómo ganar puntos:</div>
+        <div class="earn-item">📝 Publicar reseña: <strong style="margin-left:4px">+10 pts</strong></div>
+        <div class="earn-item">📸 Subir fotos: <strong style="margin-left:4px">+5 pts</strong></div>
+        <div class="earn-item">♥ Guardar favorito: <strong style="margin-left:4px">+2 pts</strong></div>
+        <div class="earn-item">✅ Verificar visita: <strong style="margin-left:4px">+15 pts</strong></div>
+      </div>
+    </div>
+    <div id="profile-tab-foodprint" style="display:none">
+      <div id="foodprint-body"></div>
+    </div>
+    <div id="profile-tab-favs" style="display:none">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <input id="favs-search" type="text" placeholder="Buscar por nombre…" oninput="renderFavs()"
+          style="flex:1;min-width:180px;padding:10px 14px;border:1px solid var(--g2);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif">
+        <select id="favs-cuisine-filter" onchange="renderFavs()" style="padding:10px 12px;border:1px solid var(--g2);border-radius:10px;font-size:13px;font-family:'Inter',sans-serif;background:var(--white)">
+          <option value="">Todas las cocinas</option>
+        </select>
+        <select id="favs-location-filter" onchange="renderFavs()" style="padding:10px 12px;border:1px solid var(--g2);border-radius:10px;font-size:13px;font-family:'Inter',sans-serif;background:var(--white)">
+          <option value="">Todas las ubicaciones</option>
+        </select>
+      </div>
+      <div id="favs-list"></div>
+    </div>
+    <div id="profile-tab-niveles" style="display:none">
+      <div class="rep-card">
+        <div class="rep-header">⭐ Niveles</div>
+        <div class="level-list">
+          <div class="level-row"><div class="level-icon">⭐</div><div class="level-name">Foodie</div><div class="level-pts">0+ puntos</div></div>
+          <div class="level-row"><div class="level-icon">🏅</div><div class="level-name">Foodie Pro</div><div class="level-pts">50+ puntos</div></div>
+          <div class="level-row"><div class="level-icon">🌐</div><div class="level-name">Experto Local</div><div class="level-pts">200+ puntos</div></div>
+          <div class="level-row current"><div class="level-icon">🛡</div><div class="level-name">Crítico Verificado</div><div class="level-pts">500+ puntos</div><div class="current-badge">Actual</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ FICHA DE RESTAURANTE ═══════════════════════════════ -->
+<div id="page-restaurante" class="page">
+  <div class="detail-page" id="restaurante-body"></div>
+</div>
+
+<div id="page-creador-perfil" class="page">
+  <div class="detail-page" id="creador-perfil-body"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+<script>
+window.addEventListener('error', function(e){
+  console.error('[GastroMap error]', e.message, 'at', e.filename+':'+e.lineno, e.error);
+});
+</script>
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let favorites = JSON.parse(localStorage.getItem('gm_favs')||'[]');
+let leafletMap = null, geoLayerGroup = null, markersById = {}, allOSMPlaces = [], allOSMMap = [], openTooltipLayer = null;
+let activeMapItem = null;
+function closeOpenTooltip(){
+  if(openTooltipLayer){ openTooltipLayer.closeTooltip(); openTooltipLayer=null; }
+}
+let botHistory = [];
+let botTyping = false;
+
+// ═══════════════════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════════════════
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if(id==='mapa' && !leafletMap) initMap();
+  if(id==='tendencias') renderTrending();
+  if(id==='listas') renderLists();
+  if(id==='creadores') renderCreators();
+  if(id==='ia' && !iaDefaultsApplied){ applyDefaultAllergiesToForm('ia-alergias'); iaDefaultsApplied=true; }
+  if(id==='viajero' && !viajeroDefaultsApplied){ applyDefaultAllergiesToForm('viajero-alergias'); viajeroDefaultsApplied=true; }
+  if(id==='perfil') renderPerfil();
+}
+
+// ═══════════════════════════════════════════════════════════
+// OSM UTILS
+// ═══════════════════════════════════════════════════════════
+const EMOJIS = {restaurant:'🍽',cafe:'☕',bar:'🍷',fast_food:'🍔',bakery:'🥐',pub:'🍺',ice_cream:'🍦',default:'🍴'};
+function getEmoji(tags){
+  if(!tags) return EMOJIS.default;
+  const c=(tags.cuisine||'').toLowerCase();
+  if(c.includes('sushi')||c.includes('japanese')) return '🍣';
+  if(c.includes('pizza')||c.includes('italian')) return '🍕';
+  if(c.includes('spanish')||c.includes('tapas')) return '🥘';
+  if(c.includes('burger')||c.includes('american')) return '🍔';
+  if(c.includes('french')||c.includes('croissant')) return '🥐';
+  if(c.includes('mexican')) return '🌮';
+  if(c.includes('chinese')) return '🥡';
+  if(c.includes('indian')) return '🍛';
+  if(c.includes('seafood')||c.includes('fish')) return '🦞';
+  if(c.includes('steak')||c.includes('grill')||c.includes('bbq')) return '🥩';
+  return EMOJIS[tags.amenity]||EMOJIS.default;
+}
+function fmtCuisine(tags){
+  if(!tags) return '';
+  const c=tags.cuisine;
+  if(!c) return cap(tags.amenity||'');
+  return c.split(';').map(x=>cap(x.trim())).slice(0,2).join(' · ');
+}
+// ═══════════════════════════════════════════════════════════
+// TOP GLOBAL (default landing content, before any search)
+// ═══════════════════════════════════════════════════════════
+const GLOBAL_TOP=[
+  {name:'Noma',address:'Refshalevej 96, 1432 København K',cuisine:'Nórdica Contemporánea',rating:4.6,reviews:'9,500',price:'350€/persona',score:95,badges:['top','creators','trend'],photo:'https://images.unsplash.com/photo-1731941465921-eb4285693713?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Osteria Francescana',address:'Via Stella 22, 41121 Modena MO',cuisine:'Italiana Contemporánea',rating:4.5,reviews:'6,200',price:'250€/persona',score:94,badges:['top','creators','trend'],photo:'https://images.unsplash.com/photo-1705948730553-3ea0c89ae6fb?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'DiverXO',address:'Calle del Padre Damián, 23, 28036 Madrid',cuisine:'Fusión Creativa',rating:4.7,reviews:'5,600',price:'250€/persona',score:94,badges:['top','creators','trend'],rising:true,photo:'https://images.unsplash.com/photo-1663530761401-15eefb544889?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Central',address:'Av. Pedro de Osma 301, Barranco, Lima',cuisine:'Peruana de Autor',rating:4.7,reviews:'4,900',price:'220€/persona',score:94,badges:['top','trend'],photo:'https://images.unsplash.com/photo-1676471932681-45fa972d848a?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Disfrutar',address:'Carrer de Villarroel 163, 08036 Barcelona',cuisine:'Mediterránea Creativa',rating:4.6,reviews:'3,800',price:'260€/persona',score:93,badges:['top','creators'],photo:'https://images.unsplash.com/photo-1616671276441-2f2c277b8bf9?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Le Bernardin',address:'155 W 51st St, New York, NY',cuisine:'Francesa · Mariscos',rating:4.6,reviews:'3,100',price:'280€/persona',score:93,badges:['top','trend'],photo:'https://images.unsplash.com/photo-1676471926534-d5c9771909fa?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Sukiyabashi Jiro',address:'Chuo City, Tokyo',cuisine:'Japonesa · Sushi',rating:4.8,reviews:'2,700',price:'320€/persona',score:93,badges:['creators'],photo:'https://images.unsplash.com/photo-1717988732486-285ea23a6f88?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'El Celler de Can Roca',address:'Carrer de Can Sunyer 48, 17007 Girona',cuisine:'Española · Alta Cocina',rating:4.7,reviews:'2,500',price:'260€/persona',score:92,badges:['top'],photo:'https://images.unsplash.com/photo-1621494268492-d01b98eba7e4?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Pujol',address:'Francisco Petrarca 254, Ciudad de México',cuisine:'Mexicana de Autor',rating:4.6,reviews:'2,200',price:'150€/persona',score:92,badges:['trend'],photo:'https://images.unsplash.com/photo-1689672235271-727de51355e6?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Ricard Camarena Restaurant',address:'Av. de Burjassot, 54, 46009 Valencia',cuisine:'Mediterránea Creativa',rating:4.8,reviews:'1,800',price:'160€/persona',score:92,badges:['creators'],photo:'https://images.unsplash.com/photo-1626627702449-e4aaf40372f9?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:"Don Julio",address:'Guatemala 4699, Buenos Aires',cuisine:'Argentina · Parrilla',rating:4.8,reviews:'5,400',price:'90€/persona',score:91,badges:['top','trend'],photo:'https://images.unsplash.com/photo-1755811248324-c70c1f10a7fd?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Bo.lan',address:'Sukhumvit 53 Alley, Bangkok',cuisine:'Tailandesa Tradicional',rating:4.6,reviews:'1,400',price:'80€/persona',score:90,badges:['creators'],photo:'https://images.unsplash.com/photo-1616669944447-d65d41a222bd?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Gaggan Anand',address:'68/4 Soi Langsuan, Lumpini, Bangkok',cuisine:'India Progresiva',rating:4.7,reviews:'3,900',price:'240€/persona',score:93,badges:['top','trend'],photo:'https://images.unsplash.com/photo-1673706530246-4c1d8b141748?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Alinea',address:'1723 N Halsted St, Chicago, IL',cuisine:'Contemporánea',rating:4.6,reviews:'4,500',price:'350€/persona',score:93,badges:['top','creators','trend'],photo:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Eleven Madison Park',address:'11 Madison Ave, New York, NY',cuisine:'Vegetal de Autor',rating:4.5,reviews:'5,100',price:'365€/persona',score:92,badges:['top','trend'],photo:'https://images.unsplash.com/photo-1703849133132-98c23595b981?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Mugaritz',address:'Aldura Aldea 20, Errenteria, Gipuzkoa',cuisine:'Vanguardia Vasca',rating:4.6,reviews:'2,900',price:'240€/persona',score:92,badges:['creators'],photo:'https://images.unsplash.com/photo-1669487775969-945e070a778c?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Quintonil',address:'Newton 55, Polanco, Ciudad de México',cuisine:'Mexicana Contemporánea',rating:4.7,reviews:'3,300',price:'130€/persona',score:91,badges:['top','trend'],rising:true,photo:'https://images.unsplash.com/photo-1669722115140-d314341ab05d?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Septime',address:'80 Rue de Charonne, 75011 Paris',cuisine:'Bistronomía Francesa',rating:4.6,reviews:'2,600',price:'95€/persona',score:91,badges:['creators'],photo:'https://images.unsplash.com/photo-1705917893021-4853cbe1bd64?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Geranium',address:'Per Henrik Lings Allé 4, Copenhague',cuisine:'Nórdica de Autor',rating:4.8,reviews:'2,100',price:'340€/persona',score:94,badges:['top','trend'],photo:'https://images.unsplash.com/photo-1689672235501-6dc1e56d454c?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Attica',address:'74 Glen Eira Rd, Ripponlea, Melbourne',cuisine:'Australiana Nativa',rating:4.7,reviews:'2,400',price:'260€/persona',score:92,badges:['creators'],photo:'https://images.unsplash.com/photo-1514326640560-7d063ef2aed5?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+  {name:'Steirereck',address:'Am Heumarkt 2A, Viena',cuisine:'Austriaca de Autor',rating:4.6,reviews:'1,900',price:'180€/persona',score:90,badges:['top'],photo:'https://images.unsplash.com/photo-1705948731485-6e4c6c180d0d?w=800&q=80&fm=jpg&auto=format&fit=crop'},
+];
+const BADGE_META={top:{label:'🏆 Top 10',cls:'tag-top'},creators:{label:'👤 Creadores',cls:'tag-creators'},trend:{label:'🔥 Tendencia 2026',cls:'tag-trend'}};
+function priceNum(p){const m=String(p).match(/[\d.]+/);return m?parseFloat(m[0]):0;}
+function sortGlobalTop(mode){renderGlobalTop(mode);}
+function renderGlobalTop(sortMode){
+  sortMode=sortMode||'score';
+  const res=document.getElementById('explorar-results');
+  document.getElementById('explorar-section-title').innerHTML='Top <em>GastroMap</em>';
+  document.getElementById('explorar-count').textContent=GLOBAL_TOP.length+' restaurantes';
+  const filters=document.getElementById('explorar-filters');
+  filters.style.display='flex';
+  filters.innerHTML=`
+    <button class="filter-btn ${sortMode==='score'?'active':''}" onclick="sortGlobalTop('score')">✦ Global Score</button>
+    <button class="filter-btn ${sortMode==='rating'?'active':''}" onclick="sortGlobalTop('rating')">★ Valoración</button>
+    <button class="filter-btn ${sortMode==='cheap'?'active':''}" onclick="sortGlobalTop('cheap')">$ Más barato</button>
+    <button class="filter-btn ${sortMode==='expensive'?'active':''}" onclick="sortGlobalTop('expensive')">$ Más caro</button>`;
+  let list=[...GLOBAL_TOP];
+  if(sortMode==='score') list.sort((a,b)=>b.score-a.score);
+  else if(sortMode==='rating') list.sort((a,b)=>b.rating-a.rating);
+  else if(sortMode==='cheap') list.sort((a,b)=>priceNum(a.price)-priceNum(b.price));
+  else if(sortMode==='expensive') list.sort((a,b)=>priceNum(b.price)-priceNum(a.price));
+  window.__lastGlobalTopList=list;
+  res.innerHTML='<div class="cards-grid">'+list.map((r,i)=>{
+    const rank=i+1;
+    const badge=rank===1?'<div class="card-rank gold">#1</div>':rank<=3?`<div class="card-rank">#${rank}</div>`:'';
+    const risingBadge=r.rising?'<span class="cbadge cbadge-trending">📈 En alza</span>':'';
+    return `<div class="rest-card" onclick="openRestaurantFromGlobal(window.__lastGlobalTopList[${i}])">
+      <div class="card-img">
+        <img src="${r.photo}" alt="${r.name}" loading="lazy" style="width:100%;height:100%;object-fit:cover">
+        ${badge}
+        <div class="card-score">${r.score}</div>
+        <button class="card-save" onclick="toggleFav(event,${JSON.stringify({id:globalId(r.name),imgSeed:'global-'+r.name,tags:{cuisine:r.cuisine},photo:r.photo,name:r.name,address:r.address,cuisine:r.cuisine,rating:r.rating,reviewCount:r.reviews,score:r.score,phone:null,website:null,badges:r.badges.map(b=>BADGE_META[b].label)}).replace(/"/g,'&quot;')})">♡</button>
+        <div class="card-badge-row">${risingBadge}</div>
+      </div>
+      <div class="card-body">
+        <div class="card-name">${r.name}</div>
+        <div class="card-addr" style="margin-top:0;margin-bottom:8px">📍 ${r.address}</div>
+        <div class="card-cuisine">${r.cuisine}</div>
+        <div class="card-meta">
+          <span class="card-rating">★ ${r.rating} (${r.reviews})</span>
+        </div>
+        <div style="color:var(--purple);font-size:12px;font-weight:600;margin-top:6px">~${r.price}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${r.badges.map(b=>`<span class="tag ${BADGE_META[b].cls}">${BADGE_META[b].label}</span>`).join('')}</div>
+      </div>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1).replace(/_/g,' '):''}
+function hashStr(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))&0xffffff;return Math.abs(h)}
+function globalId(name){return 2000000+(hashStr(name)%1000000);}
+function cuisineKeyword(tags){
+  if(!tags) return 'restaurant,food';
+  const c=(tags.cuisine||'').toLowerCase();
+  if(c.includes('sushi')||c.includes('japanese')) return 'sushi';
+  if(c.includes('pizza')||c.includes('italian')) return 'pizza';
+  if(c.includes('spanish')||c.includes('tapas')) return 'tapas,spanish-food';
+  if(c.includes('burger')||c.includes('american')) return 'burger';
+  if(c.includes('french')||c.includes('croissant')) return 'french-pastry';
+  if(c.includes('mexican')) return 'tacos';
+  if(c.includes('chinese')) return 'chinese-food';
+  if(c.includes('indian')) return 'curry';
+  if(c.includes('seafood')||c.includes('fish')) return 'seafood-plate';
+  if(c.includes('steak')||c.includes('grill')||c.includes('bbq')) return 'steak';
+  if(tags.amenity==='cafe') return 'coffee-shop';
+  if(tags.amenity==='bakery') return 'bakery';
+  if(tags.amenity==='bar'||tags.amenity==='pub') return 'cocktail-bar';
+  return 'fine-dining,restaurant-food';
+}
+function foodPhoto(tags,id,w,h){
+  return `https://loremflickr.com/${w||400}/${h||300}/${encodeURIComponent(cuisineKeyword(tags))}?lock=${hashStr(String(id))%9999}`;
+}
+function foodImgAttrs(tags,id,w,h){
+  const primary=foodPhoto(tags,id,w,h);
+  const fallback=`https://picsum.photos/seed/${encodeURIComponent(String(id))}/${w||400}/${h||300}`;
+  return `src="${primary}" loading="lazy" onerror="this.onerror=null;this.src='${fallback}'"`;
+}
+function avatarPhoto(seed){
+  return `https://i.pravatar.cc/120?u=${encodeURIComponent(seed)}`;
+}
+function avatarImgAttrs(seed,name){
+  const primary=avatarPhoto(seed);
+  const fallback=`https://ui-avatars.com/api/?name=${encodeURIComponent(name||seed)}&background=E0995C&color=fff&size=120`;
+  return `src="${primary}" onerror="this.onerror=null;this.src='${fallback}'"`;
+}
+function fakeScore(name){
+  let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))&0xffff;
+  return (7.2+(h%28)/10).toFixed(1);
+}
+// Genera una valoración local y otra turista, cada una con su propia semilla,
+// para que a veces coincidan y a veces se note una diferencia real (que es
+// justo el punto: sacar a la luz sitios de moda entre turistas pero flojos
+// para los locales, o joyas locales que los turistas todavía no descubren).
+function computeLocalTouristRatings(id,name){
+  const seedLocal=String(id)+name+'local';
+  const seedTourist=String(id)+name+'tourist';
+  let h1=0; for(let i=0;i<seedLocal.length;i++) h1=(h1*31+seedLocal.charCodeAt(i))&0xffff;
+  let h2=0; for(let i=0;i<seedTourist.length;i++) h2=(h2*17+seedTourist.charCodeAt(i))&0xffff;
+  const local=Math.min(5,+(3.6+(h1%140)/100).toFixed(1));
+  const tourist=Math.min(5,+(3.6+(h2%140)/100).toFixed(1));
+  return {local,tourist};
+}
+function fakeReviews(name){
+  let h=0; for(let i=0;i<name.length;i++) h=(h*17+name.charCodeAt(i))&0xffff;
+  return (Math.floor(100+(h%4900))).toLocaleString();
+}
+
+// URL de tu servidor local de restaurantes (ver carpeta gastromap-db/).
+// Si no está arrancado, GastroMap cae automáticamente a los espejos de Overpass.
+// Vacío = misma dirección desde la que se abrió esta página (funciona tanto en
+// localhost como en la IP local del Mac, para que el móvil también pueda usarlo).
+const LOCAL_DB_URL = '';
+
+async function fetchOSMBBox(s,n,w,e){
+  // 1) Intenta primero tu base de datos local — más rápida y no depende de
+  //    Overpass ni de los bloqueos de red en España. Pero si no tiene datos
+  //    para esta zona (p.ej. un usuario español de viaje en Australia),
+  //    seguimos hacia Overpass en vez de devolver "0 resultados".
+  //    Timeout corto a propósito: si tarda, mejor fallar rápido y dejar que
+  //    el usuario siga moviéndose libremente por el mapa sin esperas.
+  try{
+    const ctrl=new AbortController();
+    const t=setTimeout(()=>ctrl.abort(),3000);
+    const resp=await fetch(`${LOCAL_DB_URL}/api/restaurants?s=${s}&n=${n}&w=${w}&e=${e}&limit=500`,{signal:ctrl.signal});
+    clearTimeout(t);
+    if(resp.ok){
+      const data=await resp.json();
+      if(data.places && data.places.length>0){
+        console.log('[GastroMap] Datos servidos desde la base de datos local ('+data.places.length+' resultados)');
+        return data.places;
+      }
+      console.log('[GastroMap] La base de datos local no cubre esta zona, probando Overpass en vivo…');
+    }
+  }catch(e){
+    console.warn('[GastroMap] Servidor local no disponible ('+LOCAL_DB_URL+'), usando Overpass como respaldo. ¿Está arrancado con "npm start" en gastromap-db/?');
+  }
+
+  // 2) Si no hay servidor local corriendo, cae a los espejos públicos de Overpass
+  const query=`[out:json][timeout:25];(node["amenity"~"restaurant|cafe|bar|fast_food|bakery|pub|ice_cream"](${s},${w},${n},${e});way["amenity"~"restaurant|cafe|bar|fast_food|bakery|pub|ice_cream"](${s},${w},${n},${e}););out center 200;`;
+  const OVERPASS_MIRRORS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://lz4.overpass-api.de/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+    'https://z.overpass-api.de/api/interpreter'
+  ];
+  const controllers = OVERPASS_MIRRORS.map(()=>new AbortController());
+  const timers = controllers.map(c=>setTimeout(()=>c.abort(),10000));
+  const attempts = OVERPASS_MIRRORS.map((mirror,i)=>
+    fetch(mirror,{method:'POST',body:'data='+encodeURIComponent(query),signal:controllers[i].signal})
+      .then(r=>{ if(!r.ok) throw new Error(mirror+': HTTP '+r.status); return r; })
+      .catch(e=>{ throw new Error(mirror+': '+(e.name==='AbortError'?'tardó demasiado':(e.message||'sin conexión'))); })
+  );
+  let resp;
+  try{
+    // Prueba los 5 servidores A LA VEZ y se queda con el primero que responda bien
+    resp = await Promise.any(attempts);
+  }catch(aggErr){
+    timers.forEach(clearTimeout);
+    const failures = aggErr.errors ? aggErr.errors.map(e=>e.message) : [String(aggErr.message||aggErr)];
+    console.error('[GastroMap] Fallos Overpass:',failures); // detalle técnico solo en consola, nunca en pantalla
+    throw new Error('No se pudieron cargar restaurantes en esta zona ahora mismo. Prueba a moverte o vuelve a intentarlo en unos segundos.');
+  }
+  timers.forEach(clearTimeout);
+  controllers.forEach(c=>{ if(!c.signal.aborted) c.abort(); }); // corta los que aún sigan en vuelo, ya no los necesitamos
+  const data = await resp.json();
+  if(!data.elements) throw new Error('Overpass no devolvió datos válidos');
+  return data.elements
+    .filter(e=>e.tags&&e.tags.name)
+    .map(e=>({id:e.id,lat:e.lat||e.center?.lat,lon:e.lon||e.center?.lon,name:e.tags.name,tags:e.tags,score:fakeScore(e.tags.name),reviews:fakeReviews(e.tags.name)}))
+    .filter(p=>p.lat&&p.lon)
+    .sort((a,b)=>parseFloat(b.score)-parseFloat(a.score));
+}
+async function fetchOSMCity(city){
+  let geo;
+  try{
+    const ctrl=new AbortController();
+    const t=setTimeout(()=>ctrl.abort(),12000);
+    geo = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`,{headers:{'Accept-Language':'es'},signal:ctrl.signal});
+    clearTimeout(t);
+  }catch(e){
+    throw new Error('No se pudo conectar con Nominatim (red bloqueada, sin conexión, o tardó demasiado)');
+  }
+  if(!geo.ok) throw new Error('Nominatim respondió con error '+geo.status);
+  const geoData = await geo.json();
+  if(!geoData.length) throw new Error('Ciudad no encontrada');
+  const {lat,lon,boundingbox} = geoData[0];
+  const [s,n,w,e] = boundingbox.map(Number);
+  const places = await fetchOSMBBox(s,n,w,e);
+  return {places,lat,lon,bbox:[s,n,w,e]};
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPLORAR
+// ═══════════════════════════════════════════════════════════
+let explorarPlaces = [], explorarCity = '';
+function setHeroCity(c){document.getElementById('hero-search').value=c;heroSearch();}
+function resetCategoryFilters(){
+  const filters=document.getElementById('explorar-filters');
+  filters.innerHTML=`
+    <button class="filter-btn active" onclick="explorarFiltrar(this,'todos')">✦ Todos</button>
+    <button class="filter-btn" onclick="explorarFiltrar(this,'restaurant')">🍽 Restaurantes</button>
+    <button class="filter-btn" onclick="explorarFiltrar(this,'cafe')">☕ Cafés</button>
+    <button class="filter-btn" onclick="explorarFiltrar(this,'bar')">🍷 Bares</button>
+    <button class="filter-btn" onclick="explorarFiltrar(this,'fast_food')">🍔 Fast Food</button>
+    <button class="filter-btn" onclick="explorarFiltrar(this,'bakery')">🥐 Panaderías</button>`;
+}
+async function heroSearch(){
+  const city = document.getElementById('hero-search').value.trim();
+  if(!city) return;
+  explorarCity = city;
+  const res = document.getElementById('explorar-results');
+  const title = document.getElementById('explorar-section-title');
+  res.innerHTML = '<div class="inline-loading"><div class="spinner"></div> Buscando en OpenStreetMap…</div>';
+  resetCategoryFilters();
+  document.getElementById('explorar-filters').style.display='flex';
+  try{
+    const {places} = await fetchOSMCity(city);
+    explorarPlaces = places;
+    title.innerHTML = `Top <em>${cap(city)}</em>`;
+    document.getElementById('explorar-count').textContent = places.length+' restaurantes';
+    renderExplorar(places);
+  }catch(e){
+    res.innerHTML='<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">No encontrado</div><div class="empty-sub">'+e.message+'</div></div>';
+  }
+}
+function explorarFiltrar(btn,tipo){
+  document.querySelectorAll('#explorar-filters .filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const filtered = tipo==='todos'? explorarPlaces : explorarPlaces.filter(p=>p.tags.amenity===tipo);
+  renderExplorar(filtered);
+}
+function renderExplorar(places){
+  const res = document.getElementById('explorar-results');
+  if(!places.length){res.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">Sin resultados</div><div class="empty-sub">Prueba otro filtro.</div></div>';return;}
+  const shownPlaces=places.slice(0,60);
+  window.__lastExplorarList=shownPlaces;
+  res.innerHTML='<div class="cards-grid">'+shownPlaces.map((p,i)=>{
+    const emoji=getEmoji(p.tags);
+    const cuisine=fmtCuisine(p.tags)||cap(p.tags.amenity);
+    const addr=p.tags['addr:street']?(p.tags['addr:street']+(p.tags['addr:housenumber']?' '+p.tags['addr:housenumber']:'')):explorarCity;
+    const isSaved=favorites.some(f=>f.id===p.id);
+    const badge = i===0?'<div class="card-rank gold">#1</div>': i<3?`<div class="card-rank">#${i+1}</div>`:'';
+    const trendBadge = i<5?'<span class="cbadge cbadge-top">Top '+(i+1)+'</span>':'';
+    return `<div class="rest-card" onclick="openRestaurantFromOSM(window.__lastExplorarList[${i}])">
+      <div class="card-img">
+        <img ${foodImgAttrs(p.tags,p.id,400,300)} alt="${p.name}" style="width:100%;height:100%;object-fit:cover">
+        ${badge}
+        <div class="card-score">★ ${p.score}</div>
+        <button class="card-save ${isSaved?'saved':''}" onclick="toggleFav(event,${JSON.stringify({id:p.id,imgSeed:p.id,tags:p.tags,name:p.name,address:explorarCity,lat:p.lat,lon:p.lon,cuisine,rating:(p.score/2).toFixed(1),reviewCount:p.reviews,score:Math.round(p.score*10),phone:p.tags.phone,website:p.tags.website,badges:[]}).replace(/"/g,'&quot;')})">${isSaved?'♥':'♡'}</button>
+        <div class="card-badge-row">${trendBadge}</div>
+      </div>
+      <div class="card-body">
+        <div class="card-name">${p.name}</div>
+        <div class="card-cuisine">${cuisine}</div>
+        <div class="card-meta">
+          <span class="card-rating">★ ${p.score}</span>
+          <span class="card-price">${p.tags['addr:street']?'·':''}</span>
+          <span class="tag">${cap(p.tags.amenity||'')}</span>
+        </div>
+        <div class="card-addr">📍 ${addr}</div>
+      </div>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAPA — navegación libre, carga por zona visible
+// ═══════════════════════════════════════════════════════════
+const MAP_MIN_ZOOM = 2;
+let mapLoadTimer=null, suppressMoveUntil=0, mapLoadSeq=0;
+
+function initMap(){
+  leafletMap = L.map('leaflet-map',{worldCopyJump:true,crs:L.CRS.EPSG3857}).setView([25,10],2.3);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(leafletMap);
+  leafletMap.on('moveend zoomend',onMapMoved);
+  setTimeout(()=>leafletMap.invalidateSize(),50);
+  loadMapArea();
+}
+function onMapMoved(){
+  if(Date.now()<suppressMoveUntil) return;
+  clearTimeout(mapLoadTimer);
+  mapLoadTimer=setTimeout(loadMapArea,400);
+}
+async function loadMapArea(){
+  if(!leafletMap) return;
+  const zoom = leafletMap.getZoom();
+  const statsEl = document.getElementById('map-stats');
+  const listEl = document.getElementById('map-list');
+  if(zoom < MAP_MIN_ZOOM){
+    clearMapMarkers();
+    listEl.innerHTML='<div class="map-empty"><div class="map-empty-icon">🌍</div><div class="map-empty-title">Acércate para ver restaurantes</div><div class="map-empty-sub">Haz zoom sobre cualquier ciudad o barrio del mundo — se cargan solos, sin buscar nada.</div></div>';
+    statsEl.innerHTML='Zoom '+zoom.toFixed(1)+' — acércate más (ciudad o barrio) para cargar datos reales';
+    document.getElementById('map-filters').style.display='none';
+    return;
+  }
+  const seq=++mapLoadSeq;
+  const b=leafletMap.getBounds();
+  document.getElementById('map-loading').classList.add('show');
+  statsEl.innerHTML='Cargando esta zona…';
+  try{
+    const places=await fetchOSMBBox(b.getSouth(),b.getNorth(),b.getWest(),b.getEast());
+    if(seq!==mapLoadSeq) return; // el usuario ya se movió a otra zona, descarta esta respuesta
+    allOSMMap=places;
+    mapCategoryFilter='todos'; mapCuisineFilter='Todas';
+    updateCuisineDropdown(places);
+    document.getElementById('map-filters').style.display='flex';
+    document.querySelectorAll('#map-filters .filter-btn').forEach((btn,i)=>btn.classList.toggle('active',i===0));
+    renderMapResults(places);
+  }catch(e){
+    if(seq!==mapLoadSeq) return;
+    statsEl.textContent='Error: '+e.message;
+  }finally{
+    if(seq===mapLoadSeq) document.getElementById('map-loading').classList.remove('show');
+  }
+}
+// Diccionario de platos/tipos de cocina reconocidos → qué buscar en el tag "cuisine" de OSM
+const FOOD_KEYWORDS={
+  'tapas':['tapas','spanish'],'paella':['spanish','paella'],'marisco':['seafood','fish'],'mariscos':['seafood','fish'],
+  'pasta':['italian','pasta'],'pizza':['pizza','italian'],'sushi':['japanese','sushi'],'ramen':['japanese','ramen'],
+  'tacos':['mexican'],'taco':['mexican'],'mexicana':['mexican'],'hamburguesa':['burger','american'],'hamburguesas':['burger','american'],
+  'curry':['indian','curry'],'india':['indian'],'kebab':['kebab','turkish'],'croissant':['french'],'francesa':['french'],
+  'dim sum':['chinese'],'china':['chinese'],'china food':['chinese'],'bbq':['bbq','grill','steak'],'barbacoa':['bbq','grill','steak'],
+  'parrilla':['grill','steak','bbq'],'asado':['grill','steak'],'vegano':['vegan'],'vegana':['vegan'],'vegetariano':['vegetarian'],
+  'vegetariana':['vegetarian'],'helado':['ice_cream'],'helados':['ice_cream'],'café':['cafe'],'cafe':['cafe'],
+  'pinchos':['spanish','tapas'],'italiana':['italian'],'japonesa':['japanese'],'griega':['greek'],'thai':['thai'],'tailandesa':['thai'],
+  'coreana':['korean'],'peruana':['peruvian'],'libanesa':['lebanese'],'marroqui':['moroccan'],'poke':['poke','hawaiian']
+};
+function matchFoodKeyword(text){
+  const q=text.toLowerCase().trim();
+  return FOOD_KEYWORDS[q]||null;
+}
+function getCurrentLocation(){
+  return new Promise((resolve,reject)=>{
+    if(!navigator.geolocation){ reject(new Error('Tu navegador no permite geolocalización')); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos=>resolve({lat:pos.coords.latitude,lon:pos.coords.longitude}),
+      err=>reject(new Error('No pude acceder a tu ubicación — revisa los permisos de localización del navegador.')),
+      {timeout:10000}
+    );
+  });
+}
+async function searchByFoodKeyword(query,cuisineMatches){
+  const loc=await getCurrentLocation();
+  suppressMoveUntil=Date.now()+1200;
+  leafletMap.setView([loc.lat,loc.lon],14,{animate:true});
+  const b=leafletMap.getBounds();
+  const places=await fetchOSMBBox(b.getSouth(),b.getNorth(),b.getWest(),b.getEast());
+  const filtered=places.filter(p=>{
+    const c=(p.tags.cuisine||'').toLowerCase();
+    return cuisineMatches.some(m=>c.includes(m));
+  });
+  allOSMMap=filtered.length?filtered:places;
+  mapCategoryFilter='todos'; mapCuisineFilter='Todas';
+  updateCuisineDropdown(allOSMMap);
+  document.getElementById('map-filters').style.display='flex';
+  document.querySelectorAll('#map-filters .filter-btn').forEach((btn,i)=>btn.classList.toggle('active',i===0));
+  renderMapResults(allOSMMap);
+  if(!filtered.length){
+    document.getElementById('map-stats').innerHTML='No encontré sitios de "'+query+'" cerca — te muestro todo lo que hay en la zona.';
+  }
+}
+async function mapSearch(){
+  const query = document.getElementById('map-city-input').value.trim();
+  if(!query||!leafletMap) return;
+  document.getElementById('map-loading').classList.add('show');
+  document.getElementById('map-stats').innerHTML='Buscando…';
+  try{
+    const cuisineMatches=matchFoodKeyword(query);
+    if(cuisineMatches){
+      document.getElementById('map-stats').innerHTML='Buscando "'+query+'" cerca de ti…';
+      await searchByFoodKeyword(query,cuisineMatches);
+    }else{
+      const {lat,lon} = await fetchOSMCity(query);
+      suppressMoveUntil=Date.now()+1200;
+      // Vamos directos a zoom de ciudad (14) — el bounding box que devuelve
+      // Nominatim a veces cubre toda el área metropolitana o la provincia,
+      // lo que dejaría el mapa demasiado alejado para cargar datos.
+      leafletMap.setView([lat,lon],14,{animate:true});
+      await loadMapArea();
+    }
+  }catch(e){
+    document.getElementById('map-stats').textContent='Error: '+e.message;
+  }finally{
+    document.getElementById('map-loading').classList.remove('show');
+  }
+}
+let mapCategoryFilter='todos', mapCuisineFilter='Todas';
+function mapFiltrar(btn,tipo){
+  document.querySelectorAll('#map-filters .filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  mapCategoryFilter=tipo;
+  applyMapFilters();
+}
+function mapFiltrarCocina(cuisine){
+  mapCuisineFilter=cuisine;
+  applyMapFilters();
+}
+function applyMapFilters(){
+  let filtered=allOSMMap;
+  if(mapCategoryFilter!=='todos') filtered=filtered.filter(p=>p.tags.amenity===mapCategoryFilter);
+  if(mapCuisineFilter!=='Todas') filtered=filtered.filter(p=>(fmtCuisine(p.tags)||cap(p.tags.amenity))===mapCuisineFilter);
+  renderMapResults(filtered);
+}
+function updateCuisineDropdown(places){
+  const sel=document.getElementById('map-cuisine-filter');
+  const cuisines=[...new Set(places.map(p=>fmtCuisine(p.tags)||cap(p.tags.amenity)).filter(Boolean))].sort();
+  sel.style.display=cuisines.length?'block':'none';
+  sel.innerHTML='<option value="Todas">Todas las cocinas</option>'+cuisines.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`).join('');
+  sel.value='Todas';
+}
+// Convierte los resultados de Overpass a un FeatureCollection GeoJSON estándar
+// (coordenadas [lon,lat] en WGS84 — Leaflet las reproyecta a Web Mercator EPSG:3857 al pintarlas)
+function placesToGeoJSON(places){
+  return {
+    type:'FeatureCollection',
+    features: places.map((p,i)=>({
+      type:'Feature',
+      properties:{
+        id:p.id,
+        name:p.name,
+        cuisine: fmtCuisine(p.tags)||cap(p.tags.amenity),
+        amenity: p.tags.amenity||'',
+        address: p.tags['addr:street']?`${p.tags['addr:street']} ${p.tags['addr:housenumber']||''}`.trim():'',
+        phone: p.tags.phone||'',
+        score: p.score,
+        rank: i
+      },
+      geometry:{type:'Point',coordinates:[p.lon,p.lat]}
+    }))
+  };
+}
+// Pin de marcador con la forma del logo de GastroMap: gota de mapa con
+// un tenedor dentro de un círculo. Dorado para el top 3, oscuro para el resto.
+function gastroPinSVG(isTop){
+  const gradId = isTop ? 'pg1' : 'pg0';
+  const grad = isTop
+    ? `<linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F3CE7E"/><stop offset="100%" stop-color="#D08A2E"/></linearGradient>`
+    : `<linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2A2420"/><stop offset="100%" stop-color="#1A1613"/></linearGradient>`;
+  const ring = isTop ? '#1A1613' : '#E0995C';
+  return `<svg width="30" height="38" viewBox="0 0 30 38" xmlns="http://www.w3.org/2000/svg" style="display:block">
+    <defs>${grad}</defs>
+    <path d="M15 0C6.7 0 0 6.7 0 15c0 10.9 15 23 15 23s15-12.1 15-23C30 6.7 23.3 0 15 0z" fill="url(#${gradId})" stroke="white" stroke-width="1.5"/>
+    <circle cx="15" cy="14.5" r="6.5" fill="none" stroke="${ring}" stroke-width="1.6"/>
+    <g transform="translate(15,8.2)" fill="${ring}">
+      <rect x="-3.6" y="0" width="1.3" height="5.5" rx="0.6"/>
+      <rect x="-0.65" y="0" width="1.3" height="5.5" rx="0.6"/>
+      <rect x="2.3" y="0" width="1.3" height="5.5" rx="0.6"/>
+      <path d="M -3.9 5.2 Q -3.9 7.4 -0.65 7.4 L 0.35 7.4 Q 3.6 7.4 3.6 5.2 L 3.6 4.6 L -3.9 4.6 Z"/>
+      <rect x="-0.65" y="6.8" width="1.3" height="6" rx="0.6"/>
+    </g>
+  </svg>`;
+}
+
+function renderMapResults(places){
+  clearMapMarkers();
+  const list = document.getElementById('map-list');
+  const cityFallback = document.getElementById('map-city-input').value.trim() || 'esta zona';
+  document.getElementById('map-stats').innerHTML=`<strong>${places.length}</strong> lugares · <span class="osm-badge"><span class="osm-dot"></span>OpenStreetMap</span>`;
+  if(!places.length){list.innerHTML='<div class="map-empty"><div class="map-empty-icon">🔍</div><div class="map-empty-title">Sin resultados</div></div>';return;}
+  list.innerHTML='';
+
+  const shown = places.slice(0,500);
+  const placesById = {};
+  shown.forEach(p=>{ placesById[p.id]=p; });
+  const geojson = placesToGeoJSON(shown);
+
+  geoLayerGroup = L.geoJSON(geojson,{
+    pointToLayer:(feature,latlng)=>{
+      const isTop = feature.properties.rank < 3;
+      const icon=L.divIcon({
+        html: gastroPinSVG(isTop),
+        className:'', iconSize:[30,38], iconAnchor:[15,38], popupAnchor:[0,-34], tooltipAnchor:[0,-30]
+      });
+      return L.marker(latlng,{icon});
+    },
+    onEachFeature:(feature,layer)=>{
+      const props=feature.properties;
+      layer.bindTooltip(`${props.name} · ★ ${props.score}`,{direction:'top',offset:[0,-10],className:'restaurant-tooltip'});
+      markersById[props.id]=layer;
+      layer.on('click',()=>{
+        if(layer.isTooltipOpen()){
+          openRestaurantFromOSM(placesById[props.id]);
+        }else{
+          if(openTooltipLayer && openTooltipLayer!==layer) openTooltipLayer.closeTooltip();
+          layer.openTooltip();
+          openTooltipLayer=layer;
+        }
+      });
+    }
+  }).addTo(leafletMap);
+  leafletMap.off('click',closeOpenTooltip);
+  leafletMap.on('click',closeOpenTooltip);
+
+  shown.forEach(p=>{
+    const cuisine=fmtCuisine(p.tags)||cap(p.tags.amenity);
+    const item=document.createElement('div');
+    item.className='map-item'; item.id='mitem-'+p.id;
+    item.innerHTML=`<div class="map-emoji"><img ${foodImgAttrs(p.tags,p.id,80,80)} alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"></div><div style="flex:1;min-width:0"><div class="map-item-name">${p.name}</div><div class="map-item-sub">${cuisine}</div></div><div class="map-item-dist">★ ${p.score}</div>`;
+    item.onclick=()=>openRestaurantFromOSM(p);
+    list.appendChild(item);
+  });
+}
+function selectMapItem(p,item){
+  if(activeMapItem) activeMapItem.classList.remove('active');
+  item.classList.add('active'); activeMapItem=item;
+  item.scrollIntoView({behavior:'smooth',block:'nearest'});
+  leafletMap.setView([p.lat,p.lon],17,{animate:true});
+  const layer=markersById[p.id];
+  if(layer) layer.openPopup();
+}
+function clearMapMarkers(){
+  if(geoLayerGroup && leafletMap) leafletMap.removeLayer(geoLayerGroup);
+  geoLayerGroup=null;
+  markersById={};
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// FAVORITOS
+// ═══════════════════════════════════════════════════════════
+function toggleFav(evt,detail){
+  evt.stopPropagation();
+  const btn=evt.currentTarget;
+  const idx=favorites.findIndex(f=>f.id===detail.id);
+  if(idx>=0){favorites.splice(idx,1);btn.textContent='♡';btn.classList.remove('saved');}
+  else{favorites.push({...detail,addedAt:new Date().toISOString()});btn.textContent='♥';btn.classList.add('saved');}
+  localStorage.setItem('gm_favs',JSON.stringify(favorites));
+  updateFavCount();
+}
+function updateFavCount(){
+  document.getElementById('pstat-favs').textContent=favorites.length;
+  document.getElementById('rep-favs').textContent=favorites.length;
+}
+function favLocation(f){
+  // Extrae algo tipo "ciudad/país" de la dirección guardada, para el filtro de ubicación
+  const addr=f.address||'';
+  const parts=addr.split(',').map(s=>s.trim()).filter(Boolean);
+  return parts.length ? parts[parts.length-1] : (addr||'Sin ubicación');
+}
+function renderFavs(){
+  const list=document.getElementById('favs-list');
+  if(!favorites.length){
+    list.innerHTML='<div class="favs-empty"><div class="favs-empty-icon">♡</div><div class="empty-title">Sin favoritos aún</div><div class="empty-sub">Guarda restaurantes desde Explorar o el Mapa.</div></div>';
+    document.getElementById('favs-cuisine-filter').innerHTML='<option value="">Todas las cocinas</option>';
+    document.getElementById('favs-location-filter').innerHTML='<option value="">Todas las ubicaciones</option>';
+    return;
+  }
+  // Rellena los desplegables de filtro con los valores que de verdad existen en tus favoritos
+  const cuisineSel=document.getElementById('favs-cuisine-filter');
+  const locationSel=document.getElementById('favs-location-filter');
+  const prevCuisine=cuisineSel.value, prevLocation=locationSel.value;
+  const cuisines=[...new Set(favorites.map(f=>f.cuisine).filter(Boolean))].sort();
+  const locations=[...new Set(favorites.map(favLocation))].sort();
+  cuisineSel.innerHTML='<option value="">Todas las cocinas</option>'+cuisines.map(c=>`<option value="${c}">${c}</option>`).join('');
+  locationSel.innerHTML='<option value="">Todas las ubicaciones</option>'+locations.map(l=>`<option value="${l}">${l}</option>`).join('');
+  cuisineSel.value=cuisines.includes(prevCuisine)?prevCuisine:'';
+  locationSel.value=locations.includes(prevLocation)?prevLocation:'';
+
+  const q=(document.getElementById('favs-search').value||'').trim().toLowerCase();
+  const cuisineFilter=cuisineSel.value;
+  const locationFilter=locationSel.value;
+  const filtered=favorites.filter(f=>
+    (!q || f.name.toLowerCase().includes(q)) &&
+    (!cuisineFilter || f.cuisine===cuisineFilter) &&
+    (!locationFilter || favLocation(f)===locationFilter)
+  );
+
+  if(!filtered.length){
+    list.innerHTML='<div class="favs-empty"><div class="favs-empty-icon">🔍</div><div class="empty-title">Sin resultados con esos filtros</div></div>';
+    return;
+  }
+  window.__lastFavsList=filtered;
+  list.innerHTML=filtered.map((f,i)=>`<div class="fav-item" style="cursor:pointer" onclick="openRestaurant(window.__lastFavsList[${i}])">
+    <div class="fav-heart">♥</div>
+    <div class="fav-info">
+      <div class="fav-name">${f.name}</div>
+      <div class="fav-city">${f.cuisine?f.cuisine+' · ':''}${favLocation(f)}</div>
+    </div>
+    ${f.score?`<div style="font-size:13px;font-weight:700;color:var(--orange);white-space:nowrap;margin-right:8px">★ ${f.score}</div>`:''}
+    <button class="fav-del" onclick="event.stopPropagation();removeFav('${f.id}')">🗑</button>
+  </div>`).join('');
+}
+function removeFav(id){favorites=favorites.filter(f=>f.id!=id);localStorage.setItem('gm_favs',JSON.stringify(favorites));renderFavs();updateFavCount();}
+
+// ═══════════════════════════════════════════════════════════
+// TENDENCIAS
+// ═══════════════════════════════════════════════════════════
+const TREND_DESC_TEMPLATES=[
+  r=>`POV: acabas de descubrir ${r.name} 🔥 ${r.cuisine.toLowerCase()} en su máximo esplendor`,
+  r=>`${r.score}/100 en GastroMap — reserva con semanas de antelación, merece la pena`,
+  r=>`El secreto mejor guardado de ${r.address.split(',').pop().trim()} 🤫`,
+  r=>`Esta experiencia en ${r.name} cambió mi forma de ver la gastronomía 🍽`,
+  r=>`Si vas a ${r.address.split(',').pop().trim()}, esto no te lo puedes perder 🔥`
+];
+function buildTrending(){
+  const pool = (typeof CREATORS!=='undefined'&&CREATORS.length) ? CREATORS.map(c=>c.handle) : ['@gastromap'];
+  return GLOBAL_TOP.map(r=>{
+    const h = hashStr(r.name);
+    return {
+      name:r.name,
+      loc:`${r.cuisine} · ${r.address.split(',').pop().trim()}`,
+      cuisineTag:r.cuisine,
+      photo:r.photo,
+      creator: pool[h % pool.length],
+      likes: (10+(h%50))+'.'+(h%10)+'K',
+      comments: (200+(h%3800)).toLocaleString(),
+      desc: TREND_DESC_TEMPLATES[h % TREND_DESC_TEMPLATES.length](r)
+    };
+  });
+}
+function renderTrending(){
+  const grid=document.getElementById('trending-grid');
+  const data=buildTrending();
+  grid.innerHTML=data.map((d,i)=>`
+    <div class="trend-card" onclick="openRestaurantFromGlobal(GLOBAL_TOP[${i}])">
+      <div class="trend-img">
+        <img src="${d.photo}" alt="${d.name}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
+        <div class="trend-overlay"></div>
+        <div class="trend-stats">
+          <div class="trend-stat">♥ ${d.likes}</div>
+          <div class="trend-stat">💬 ${d.comments}</div>
+        </div>
+        <div class="trend-content">
+          <div class="trend-creator"><img ${avatarImgAttrs(d.creator,d.creator)} alt="" style="width:22px;height:22px;border-radius:50%;object-fit:cover;border:1.5px solid rgba(255,255,255,0.3)"><div class="trend-handle">${d.creator}</div></div>
+          <div class="trend-name">${d.name}</div>
+          <div class="trend-loc">${d.loc}</div>
+        </div>
+      </div>
+      <div class="trend-body"><div class="trend-desc">${d.desc}</div></div>
+    </div>`).join('');
+}
+function trendTab(btn,tab){
+  document.querySelectorAll('.trend-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  renderTrending();
+}
+
+// ═══════════════════════════════════════════════════════════
+// LISTAS
+// ═══════════════════════════════════════════════════════════
+const LISTS_DATA=[
+  {emoji:'🍔',title:'Mejores hamburguesas de Valencia',city:'Valencia'},
+  {emoji:'🥐',title:'Mejores desayunos de Madrid',city:'Madrid'},
+  {emoji:'💑',title:'Restaurantes para citas en Miami',city:'Miami'},
+  {emoji:'🌙',title:'Abiertos después de medianoche',city:'Madrid'},
+  {emoji:'🍣',title:'Mejor sushi de Barcelona',city:'Barcelona'},
+  {emoji:'🍕',title:'Mejores pizzerías de Roma',city:'Roma'},
+  {emoji:'🥘',title:'Tapas auténticas en Sevilla',city:'Sevilla'},
+  {emoji:'🌿',title:'Restaurantes veganos en Paris',city:'Paris'},
+  {emoji:'🍰',title:'Mejores postres de Tokyo',city:'Tokyo'},
+  {emoji:'☕',title:'Mejores cafeterías de Valencia',city:'Valencia'},
+  {emoji:'🥖',title:'Panaderías con encanto en Lisboa',city:'Lisboa'},
+  {emoji:'🍜',title:'Ramen imprescindible en Londres',city:'Londres'},
+  {emoji:'🦐',title:'Marisco fresco en Buenos Aires',city:'Buenos Aires'},
+  {emoji:'🌮',title:'Los mejores tacos de Ciudad de México',city:'Ciudad de México'},
+  {emoji:'🍷',title:'Restaurantes con buena carta de vinos en Milán',city:'Milán'},
+  {emoji:'🥗',title:'Comida saludable en Berlín',city:'Berlín'},
+  {emoji:'🍝',title:'Pasta casera en Nápoles',city:'Nápoles'},
+  {emoji:'🍦',title:'Mejores heladerías de Ámsterdam',city:'Ámsterdam'},
+  {emoji:'🥩',title:'Steakhouses imprescindibles en Nueva York',city:'Nueva York'},
+  {emoji:'🍛',title:'Curry auténtico en Bangkok',city:'Bangkok'},
+  {emoji:'🥟',title:'Dim sum imprescindible en Hong Kong',city:'Hong Kong'},
+  {emoji:'🍤',title:'Cocina callejera en Singapur',city:'Singapur'},
+  {emoji:'🌯',title:'Kebab de verdad en Estambul',city:'Estambul'},
+  {emoji:'🍲',title:'Cocina reconfortante en Copenhague',city:'Copenhague'},
+  {emoji:'🥯',title:'Brunch de fin de semana en Chicago',city:'Chicago'},
+  {emoji:'🍱',title:'Mejor omakase de Los Ángeles',city:'Los Ángeles'},
+  {emoji:'🧆',title:'Comida libanesa en Dubái',city:'Dubái'},
+  {emoji:'🍩',title:'Dulces y repostería en Viena',city:'Viena'},
+  {emoji:'🍺',title:'Cervecerías con buena comida en Múnich',city:'Múnich'},
+  {emoji:'🦞',title:'Marisco de lujo en Boston',city:'Boston'},
+  {emoji:'🍳',title:'Los mejores brunch de San Francisco',city:'San Francisco'},
+  {emoji:'🥙',title:'Comida griega auténtica en Atenas',city:'Atenas'},
+  {emoji:'🍚',title:'Cocina coreana imprescindible en Seúl',city:'Seúl'},
+  {emoji:'🥞',title:'Desayunos de domingo en Toronto',city:'Toronto'},
+  {emoji:'🍢',title:'Izakayas con ambiente en Osaka',city:'Osaka'},
+  {emoji:'🌶️',title:'Comida picante de verdad en Sídney',city:'Sídney'},
+  {emoji:'🥂',title:'Restaurantes para celebraciones en Praga',city:'Praga'},
+  {emoji:'🍽️',title:'Alta cocina en Estocolmo',city:'Estocolmo'},
+  {emoji:'👨‍👩‍👧‍👦',title:'Sitios ideales para ir en familia en Dublín',city:'Dublín'},
+  {emoji:'💻',title:'Buenos para trabajar con portátil en Ámsterdam',city:'Ámsterdam'},
+  {emoji:'🌆',title:'Mejores terrazas con vistas en Lisboa',city:'Lisboa'},
+  {emoji:'💰',title:'Comer bien y barato en Budapest',city:'Budapest'},
+  {emoji:'🥑',title:'Brunch saludable en Melbourne',city:'Melbourne'},
+  {emoji:'🍗',title:'El mejor pollo frito de Nashville',city:'Nashville'},
+  {emoji:'🦪',title:'Bares de ostras en Nueva Orleans',city:'Nueva Orleans'},
+  {emoji:'🍡',title:'Postres tradicionales en Kioto',city:'Kioto'},
+  {emoji:'🌊',title:'Restaurantes frente al mar en Río de Janeiro',city:'Río de Janeiro'},
+  {emoji:'🧀',title:'Fondue y quesos en Zúrich',city:'Zúrich'},
+  {emoji:'🍖',title:'Barbacoa auténtica en Austin',city:'Austin'},
+  {emoji:'🐟',title:'Cocina peruana de mar en Lima',city:'Lima'},
+];
+function renderLists(query){
+  const q=(query||'').trim().toLowerCase();
+  const filtered = q ? LISTS_DATA.filter(l=>l.title.toLowerCase().includes(q)||l.city.toLowerCase().includes(q)) : LISTS_DATA;
+  const label=document.getElementById('lists-section-label');
+  if(label) label.textContent = q ? `Resultados para "${query.trim()}" (${filtered.length})` : 'Populares';
+  const grid=document.getElementById('lists-grid');
+  if(!filtered.length){
+    grid.innerHTML='<div class="favs-empty"><div class="favs-empty-icon">🔍</div><div class="empty-title">Sin listas para "'+query.trim()+'"</div></div>';
+    return;
+  }
+  grid.innerHTML=filtered.map(l=>`
+    <div class="list-card" onclick="setHeroCity('${l.city}');showPageDirect('explorar')">
+      <div class="list-emoji-wrap">${l.emoji}</div>
+      <div><div class="list-info-title">${l.title}</div><div class="list-info-sub">${l.city}</div></div>
+      <div class="list-arrow">›</div>
+    </div>`).join('');
+}
+function filterLists(query){ renderLists(query); }
+function showPageDirect(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  const links=[...document.querySelectorAll('.nav-link')];
+  const map={'explorar':0,'mapa':1,'tendencias':2,'listas':3,'ia':4,'creadores':5,'viajero':6,'gastrobot':7,'ajustes':8,'perfil':9};
+  if(links[map[id]]) links[map[id]].classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════════
+// FICHA DE RESTAURANTE
+// ═══════════════════════════════════════════════════════════
+let lastPageBeforeDetail='explorar';
+function openRestaurantFromOSM(p){
+  const cuisine=fmtCuisine(p.tags)||cap(p.tags.amenity);
+  const address=p.tags['addr:street']?`${p.tags['addr:street']} ${p.tags['addr:housenumber']||''}`.trim():'';
+  openRestaurant({
+    id:p.id, imgSeed:p.id, tags:p.tags, name:p.name, address, lat:p.lat, lon:p.lon,
+    cuisine, rating:(p.score/2).toFixed(1), reviewCount:p.reviews,
+    score:Math.round(p.score*10), phone:p.tags.phone, website:p.tags.website, badges:[]
+  });
+}
+function openRestaurantFromGlobal(r){
+  openRestaurant({
+    id:globalId(r.name), imgSeed:'global-'+r.name, tags:{cuisine:r.cuisine}, photo:r.photo,
+    name:r.name, address:r.address, cuisine:r.cuisine, rating:r.rating,
+    reviewCount:r.reviews, score:r.score, phone:null, website:null,
+    badges:r.badges.map(b=>BADGE_META[b].label)
+  });
+}
+// Geocodifica un nombre/dirección a lat/lon, sin traer también la lista de
+// restaurantes de la zona (para eso ya está fetchOSMCity).
+async function geocodeOnly(query){
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),12000);
+  let resp;
+  try{
+    resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,{headers:{'Accept-Language':'es'},signal:ctrl.signal});
+  }catch(e){
+    throw new Error('No se pudo conectar con Nominatim');
+  }finally{ clearTimeout(t); }
+  if(!resp.ok) throw new Error('Nominatim respondió con error '+resp.status);
+  const data = await resp.json();
+  if(!data.length) throw new Error('No encontrado');
+  return {lat:parseFloat(data[0].lat), lon:parseFloat(data[0].lon)};
+}
+// Lleva a la pestaña Mapa y centra la vista en este restaurante. Si no
+// tenemos sus coordenadas guardadas (p.ej. los 12 del Top GastroMap, que son
+// una selección editorial sin datos de OSM), las buscamos al momento.
+async function showOnGastroMap(d){
+  if(!d) return;
+  showPageDirect('mapa');
+  const goTo=(lat,lon)=>{
+    if(!leafletMap) return;
+    suppressMoveUntil=Date.now()+1200;
+    leafletMap.setView([lat,lon],17,{animate:true});
+    loadMapArea();
+  };
+  if(d.lat && d.lon){ goTo(d.lat,d.lon); return; }
+  const statsEl=document.getElementById('map-stats');
+  if(statsEl) statsEl.innerHTML='Buscando "'+d.name+'" en el mapa…';
+  try{
+    const {lat,lon}=await geocodeOnly(d.name+' '+(d.address||''));
+    goTo(lat,lon);
+  }catch(e){
+    if(statsEl) statsEl.innerHTML='No pude localizar "'+d.name+'" en el mapa. Prueba a buscarlo manualmente.';
+  }
+}
+function openRestaurant(d){
+  const active=document.querySelector('.page.active');
+  if(active && active.id!=='page-restaurante') lastPageBeforeDetail=active.id.replace('page-','');
+  const ratingNum=parseFloat(d.rating)||0;
+  const ratingPct=Math.max(0,Math.min(100,Math.round((ratingNum/5)*100)));
+  const reviewNum=parseFloat(String(d.reviewCount).replace(/[.,]/g,''))||0;
+  const volumePct=Math.max(0,Math.min(100,Math.round(Math.log10(reviewNum+1)/4*100)));
+  const isSaved=favorites.some(f=>f.id===d.id);
+  const lt=computeLocalTouristRatings(d.id,d.name);
+  const ltGap=lt.local-lt.tourist;
+  const ltInsight = ltGap>=0.5 ? '🏠 Favorito de locales — poco conocido entre turistas todavía'
+    : ltGap<=-0.5 ? '🧳 Más popular entre turistas que entre locales'
+    : '✓ Igual de bien valorado por locales y turistas';
+  window.__lastDetailD=d; // para que el botón "Ver en el mapa" pueda acceder a los datos de este restaurante
+  document.getElementById('restaurante-body').innerHTML=`
+    <button class="detail-back" onclick="showPageDirect(lastPageBeforeDetail)">← Volver</button>
+    <div class="detail-layout">
+      <div>
+        <div class="detail-hero">
+          <img ${d.photo?`src="${d.photo}" loading="lazy"`:foodImgAttrs(d.tags,d.imgSeed,900,500)} alt="${d.name}">
+          <div class="detail-hero-overlay"></div>
+          <div class="detail-hero-text">
+            <h1>${d.name}</h1>
+            <div class="detail-hero-addr">📍 ${d.address||''}</div>
+          </div>
+          <div class="detail-hero-score">${d.score}</div>
+        </div>
+        <div class="detail-meta-row">
+          <div class="detail-rating">★ ${d.rating} <span>(${d.reviewCount} reseñas)</span></div>
+          <span class="tag">${d.cuisine}</span>
+          ${(d.badges||[]).map(b=>`<span class="tag tag-top">${b}</span>`).join('')}
+        </div>
+        <div class="detail-actions">
+          <button class="detail-btn primary" onclick="showOnGastroMap(window.__lastDetailD)">📍 Ver en el mapa</button>
+          ${d.phone?`<a class="detail-btn" href="tel:${d.phone}">📞 Llamar</a>`:''}
+          ${d.website?`<a class="detail-btn" href="${d.website}" target="_blank" rel="noopener">🌐 Web</a>`:''}
+          <button class="detail-btn" onclick="toggleFav(event,${JSON.stringify(d).replace(/"/g,'&quot;')})">${isSaved?'♥ Guardado':'♡ Guardar'}</button>
+        </div>
+        <div class="detail-tabs">
+          <button class="detail-tab active" id="tab-btn-resenas" onclick="detailTab(this,'resenas')">Reseñas (0)</button>
+          <button class="detail-tab" onclick="detailTab(this,'precios')">Precios</button>
+          <button class="detail-tab" onclick="detailTab(this,'info')">Info</button>
+        </div>
+        <div id="detail-tab-resenas">
+          <div class="review-card" id="review-form-area"></div>
+          <div id="reviews-list"><div class="inline-loading"><div class="spinner"></div> Cargando reseñas…</div></div>
+        </div>
+        <div id="detail-tab-precios" style="display:none">
+          <div class="review-card"><div class="detail-info-list">
+            <div>💰 Rango de precios estimado: no disponible en OpenStreetMap para este local todavía.</div>
+          </div></div>
+        </div>
+        <div id="detail-tab-info" style="display:none">
+          <div class="review-card"><div class="detail-info-list">
+            <div>🍽 <strong>Cocina:</strong>&nbsp;${d.cuisine}</div>
+            <div>📍 <strong>Dirección:</strong>&nbsp;${d.address||'No disponible'}</div>
+            <div>📞 <strong>Teléfono:</strong>&nbsp;${d.phone||'No disponible'}</div>
+            <div>🌐 <strong>Web:</strong>&nbsp;${d.website||'No disponible'}</div>
+          </div></div>
+        </div>
+      </div>
+      <div class="score-card">
+        <h3>Global Score</h3>
+        <div class="score-header">
+          <div class="score-badge-lg">${d.score}</div>
+          <div><div style="font-size:20px;font-weight:700">${d.score}/100</div><div style="font-size:12px;color:var(--textl)">Puntuación compuesta</div></div>
+        </div>
+        <div class="score-bar-row"><div class="score-bar-label"><span>Rating Google</span><span>${ratingPct}%</span></div><div class="score-bar-track"><div class="score-bar-fill" style="width:${ratingPct}%"></div></div></div>
+        <div class="score-bar-row"><div class="score-bar-label"><span>Volumen reseñas</span><span>${volumePct}%</span></div><div class="score-bar-track"><div class="score-bar-fill" style="width:${volumePct}%"></div></div></div>
+        <div class="score-bar-row"><div class="score-bar-label"><span>Reseñas plataforma</span><span>0%</span></div><div class="score-bar-track"><div class="score-bar-fill" style="width:0%"></div></div></div>
+        <div class="score-bar-row"><div class="score-bar-label"><span>Críticos verificados</span><span>0%</span></div><div class="score-bar-track"><div class="score-bar-fill" style="width:0%"></div></div></div>
+        <div class="score-note">El Global Score combina rating de Google, volumen de reseñas, opiniones de críticos verificados y reseñas de la comunidad para ofrecer una puntuación fiable.</div>
+      </div>
+      <div class="score-card" style="margin-top:16px">
+        <h3>🏠 Locales vs. 🧳 Turistas</h3>
+        <div style="display:flex;gap:12px;margin:14px 0">
+          <div style="flex:1;text-align:center;padding:16px 8px;background:var(--g1);border-radius:12px">
+            <div style="font-size:26px;font-weight:700;color:#1D9E75">★ ${lt.local}</div>
+            <div style="font-size:11px;color:var(--textl);margin-top:4px">🏠 Valoración local</div>
+          </div>
+          <div style="flex:1;text-align:center;padding:16px 8px;background:var(--g1);border-radius:12px">
+            <div style="font-size:26px;font-weight:700;color:var(--orange)">★ ${lt.tourist}</div>
+            <div style="font-size:11px;color:var(--textl);margin-top:4px">🧳 Valoración turista</div>
+          </div>
+        </div>
+        <div class="score-note">${ltInsight}</div>
+      </div>
+    </div>`;
+  showPageDirect('restaurante');
+  window.scrollTo(0,0);
+  renderReviewForm();
+  loadReviews(d.id, d.name);
+}
+function detailTab(btn,tab){
+  document.querySelectorAll('.detail-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  ['resenas','precios','info'].forEach(t=>{
+    const el=document.getElementById('detail-tab-'+t);
+    if(el) el.style.display=t===tab?'block':'none';
+  });
+}
+let selectedReviewStars=0;
+function setReviewStars(n){
+  selectedReviewStars=n;
+  document.querySelectorAll('#review-stars span').forEach((s,i)=>s.textContent=i<n?'★':'☆');
+}
+function hoverReviewStars(n){
+  document.querySelectorAll('#review-stars span').forEach((s,i)=>s.classList.toggle('hovered',i<n));
+}
+function renderReviewForm(){
+  const area=document.getElementById('review-form-area');
+  if(!area) return;
+  if(!currentUser){
+    area.innerHTML=`<h3>Deja tu reseña</h3><div style="font-size:13px;color:var(--textm);margin-bottom:12px">Inicia sesión para poder opinar sobre este restaurante.</div><button class="btn-ia" onclick="showPage('ajustes')">🔐 Iniciar sesión</button>`;
+    return;
+  }
+  selectedReviewStars=0;
+  area.innerHTML=`
+    <h3>Deja tu reseña</h3>
+    <div class="star-select" id="review-stars">${[1,2,3,4,5].map(n=>`<span onclick="setReviewStars(${n})" onmouseover="hoverReviewStars(${n})" onmouseout="hoverReviewStars(0)">☆</span>`).join('')}</div>
+    <div class="ia-field"><textarea class="ia-input" id="review-text" rows="3" placeholder="Comparte tu experiencia…"></textarea></div>
+    <button class="btn-ia" onclick="submitReview()">➤ Publicar Reseña</button>
+  `;
+}
+async function submitReview(){
+  if(!currentUser){ alert('Inicia sesión primero.'); return; }
+  const d=window.__lastDetailD;
+  if(!d) return;
+  if(selectedReviewStars<1){ alert('Elige una puntuación de estrellas.'); return; }
+  const text=(document.getElementById('review-text').value||'').trim();
+  if(!text){ alert('Escribe algo sobre tu experiencia.'); return; }
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/reviews`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify({restaurant_id:String(d.id),restaurant_name:d.name,rating:selectedReviewStars,text})
+    });
+    const data=await resp.json();
+    if(!resp.ok){ alert(data.error||'No se pudo publicar la reseña.'); return; }
+    renderReviewForm();
+    loadReviews(d.id,d.name);
+  }catch(e){
+    alert('Error de conexión al publicar la reseña.');
+  }
+}
+async function loadReviews(restaurantId){
+  const list=document.getElementById('reviews-list');
+  if(!list) return;
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/reviews?restaurant_id=${encodeURIComponent(String(restaurantId))}`);
+    const data=await resp.json();
+    const reviews=data.reviews||[];
+    const tabBtn=document.getElementById('tab-btn-resenas');
+    if(tabBtn) tabBtn.textContent=`Reseñas (${reviews.length})`;
+    if(!reviews.length){
+      list.innerHTML='<div class="empty-state"><div class="empty-icon">✍️</div><div class="empty-title">No hay reseñas aún</div><div class="empty-sub">¡Sé el primero en opinar!</div></div>';
+      return;
+    }
+    list.innerHTML=reviews.map(r=>`
+      <div class="review-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong>${r.user_name}</strong>
+          <span style="color:var(--orange)">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
+        </div>
+        <div style="font-size:13px;color:var(--textm);line-height:1.5;margin-bottom:6px">${r.text}</div>
+        <div style="font-size:11px;color:var(--textl)">${new Date(r.created_at).toLocaleDateString('es-ES')}</div>
+      </div>`).join('');
+  }catch(e){
+    list.innerHTML='<div class="ia-prose">No se pudieron cargar las reseñas.</div>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// CUENTAS DE USUARIO
+// ═══════════════════════════════════════════════════════════
+let authToken=localStorage.getItem('gm_auth_token')||null;
+let currentUser=null;
+async function loadCurrentUser(){
+  if(!authToken){ renderAuthUI(); return; }
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/auth/me`,{headers:{'Authorization':'Bearer '+authToken}});
+    if(!resp.ok){ authToken=null; localStorage.removeItem('gm_auth_token'); currentUser=null; renderAuthUI(); return; }
+    const data=await resp.json();
+    currentUser=data.user;
+  }catch(e){ /* sin conexión — dejamos la sesión guardada tal cual, se reintentará */ }
+  renderAuthUI();
+}
+async function registerUser(){
+  const email=(document.getElementById('auth-reg-email').value||'').trim();
+  const password=document.getElementById('auth-reg-password').value||'';
+  const name=(document.getElementById('auth-reg-name').value||'').trim();
+  const err=document.getElementById('auth-error');
+  err.textContent='';
+  if(!email||!password||!name){ err.textContent='Rellena nombre, email y contraseña.'; return; }
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/auth/register`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password,name})
+    });
+    const data=await resp.json();
+    if(!resp.ok){ err.textContent=data.error||'No se pudo crear la cuenta.'; return; }
+    authToken=data.token; currentUser=data.user;
+    localStorage.setItem('gm_auth_token',authToken);
+    renderAuthUI();
+  }catch(e){ err.textContent='Error de conexión. Inténtalo de nuevo.'; }
+}
+async function loginUser(){
+  const email=(document.getElementById('auth-login-email').value||'').trim();
+  const password=document.getElementById('auth-login-password').value||'';
+  const err=document.getElementById('auth-error');
+  err.textContent='';
+  if(!email||!password){ err.textContent='Rellena email y contraseña.'; return; }
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/auth/login`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password})
+    });
+    const data=await resp.json();
+    if(!resp.ok){ err.textContent=data.error||'No se pudo iniciar sesión.'; return; }
+    authToken=data.token; currentUser=data.user;
+    localStorage.setItem('gm_auth_token',authToken);
+    renderAuthUI();
+  }catch(e){ err.textContent='Error de conexión. Inténtalo de nuevo.'; }
+}
+async function logoutUser(){
+  try{ await fetch(`${LOCAL_DB_URL}/api/auth/logout`,{method:'POST',headers:{'Authorization':'Bearer '+authToken}}); }catch(e){}
+  authToken=null; currentUser=null;
+  localStorage.removeItem('gm_auth_token');
+  renderAuthUI();
+}
+let authView='login'; // 'login' o 'register'
+function switchAuthView(view){ authView=view; renderAuthUI(); }
+function updateProfileHero(){
+  const nameEl=document.getElementById('pfl-name'), emailEl=document.getElementById('pfl-email'), avaEl=document.getElementById('pfl-avatar');
+  if(!nameEl) return;
+  const resenasEls=[document.getElementById('pstat-resenas'),document.getElementById('rep-resenas')].filter(Boolean);
+  if(currentUser){
+    nameEl.textContent=currentUser.name;
+    emailEl.textContent=currentUser.email;
+    avaEl.textContent=currentUser.name.charAt(0).toUpperCase();
+    fetch(`${LOCAL_DB_URL}/api/reviews/mine`,{headers:{'Authorization':'Bearer '+authToken}})
+      .then(r=>r.ok?r.json():null)
+      .then(data=>{ if(data) resenasEls.forEach(el=>el.textContent=data.count); })
+      .catch(()=>{});
+  }else{
+    nameEl.textContent='Sin iniciar sesión';
+    emailEl.textContent='Ve a Ajustes para crear tu cuenta';
+    avaEl.textContent='?';
+    resenasEls.forEach(el=>el.textContent='0');
+  }
+}
+function renderAuthUI(){
+  updateProfileHero();
+  const el=document.getElementById('ajustes-auth-area');
+  if(!el) return;
+  if(currentUser){
+    el.innerHTML=`
+      <div style="font-size:14px;margin-bottom:4px">👋 Hola, <strong>${currentUser.name}</strong></div>
+      <div style="font-size:12px;color:var(--textl);margin-bottom:16px">${currentUser.email}</div>
+      <button class="btn-ia" style="background:#C0392B" onclick="logoutUser()">↪ Cerrar sesión</button>
+    `;
+    return;
+  }
+  if(authView==='register'){
+    el.innerHTML=`
+      <div style="display:flex;gap:16px;margin-bottom:14px;font-size:13px">
+        <span style="cursor:pointer;color:var(--textl)" onclick="switchAuthView('login')">Iniciar sesión</span>
+        <strong style="cursor:pointer;border-bottom:2px solid var(--orange)">Crear cuenta</strong>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="auth-reg-name" type="text" placeholder="Tu nombre" style="padding:10px 14px;border:1px solid var(--g2);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;background:var(--white);color:var(--text)">
+        <input id="auth-reg-email" type="email" placeholder="tu@email.com" style="padding:10px 14px;border:1px solid var(--g2);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;background:var(--white);color:var(--text)">
+        <input id="auth-reg-password" type="password" placeholder="Contraseña (mín. 6 caracteres)" style="padding:10px 14px;border:1px solid var(--g2);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;background:var(--white);color:var(--text)">
+        <div id="auth-error" style="font-size:12px;color:#C0392B"></div>
+        <button class="btn-ia" onclick="registerUser()">Crear cuenta</button>
+      </div>
+    `;
+  }else{
+    el.innerHTML=`
+      <div style="display:flex;gap:16px;margin-bottom:14px;font-size:13px">
+        <strong style="cursor:pointer;border-bottom:2px solid var(--orange)">Iniciar sesión</strong>
+        <span style="cursor:pointer;color:var(--textl)" onclick="switchAuthView('register')">Crear cuenta</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="auth-login-email" type="email" placeholder="tu@email.com" style="padding:10px 14px;border:1px solid var(--g2);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;background:var(--white);color:var(--text)">
+        <input id="auth-login-password" type="password" placeholder="Contraseña" style="padding:10px 14px;border:1px solid var(--g2);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;background:var(--white);color:var(--text)">
+        <div id="auth-error" style="font-size:12px;color:#C0392B"></div>
+        <button class="btn-ia" onclick="loginUser()">Iniciar sesión</button>
+      </div>
+    `;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// IA CHEF
+// ═══════════════════════════════════════════════════════════
+function toggleChip(btn){btn.classList.toggle('selected')}
+// ═══════════════════════════════════════════════════════════
+// LLAMADAS A LA API DE CLAUDE — vía tu servidor (gastromap-db/server.js),
+// que guarda la clave real y nunca la expone al navegador. Nadie que use
+// GastroMap necesita su propia cuenta de Anthropic ni clave de API.
+// ═══════════════════════════════════════════════════════════
+async function callClaude({system,messages,max_tokens}){
+  const resp=await fetch(`${LOCAL_DB_URL}/api/claude`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({system,messages,max_tokens})
+  });
+  const data=await resp.json().catch(()=>({}));
+  if(!resp.ok){
+    if(resp.status===429) throw new Error(data.error||'Has alcanzado tu límite de consultas de IA gratis por hoy. Prueba mañana.');
+    console.error('[GastroMap] Error en /api/claude',resp.status,data);
+    throw new Error(data.error||('El servidor de IA respondió con error '+resp.status+'. ¿Está arrancado "npm start" en gastromap-db/ con la clave configurada en .env?'));
+  }
+  if(!data.text) throw new Error('Respuesta inesperada del servidor de IA.');
+  return data.text;
+}
+// Busca en el texto del usuario algo parecido a una ciudad/zona ("en Godella, Valencia")
+// y trae restaurantes reales de OpenStreetMap para esa zona, para que GastroBot
+// recomiende sitios que existen de verdad en vez de inventarlos.
+// Personalidad experta compartida por GastroBot, IA Chef y Modo Viajero
+const GASTROMAP_EXPERT_PROMPT=`Eres el asistente de IA de GastroMap, experto en gastronomía, hostelería y restauración a nivel mundial. Dominas técnicas culinarias, tendencias gastronómicas, gestión y operativa de restaurantes, tipos de cocina de cualquier país, maridajes, y cultura culinaria global.
+
+Cuando en este mensaje se te faciliten datos reales de restaurantes obtenidos de OpenStreetMap, básate PREFERENTEMENTE en esos nombres reales — no inventes alternativas si ya cubren lo que se pide. Si no hay datos reales disponibles para la zona, recomienda con normalidad por tu conocimiento general — eres un experto de verdad, no hace falta que lo repitas cada vez ni que suenes inseguro por ello.
+
+Nunca recomiendes ni menciones otras apps, webs o servicios de terceros (Google Maps, TripAdvisor, TheFork, Yelp, etc.) — tú eres la única fuente que el usuario necesita dentro de GastroMap.
+
+Sé específico, útil, entusiasta y cercano. Responde en el mismo idioma en el que te escriban.`;
+let botLastLocation=null; // recuerda la última ciudad detectada en esta conversación
+function extractLocationCandidates(text){
+  const candidates=[];
+  // 1) Palabras con mayúscula tras "en"/"in" (lo más fiable: "en Denia", "en Nueva York")
+  const capRe=/\b(?:en|in)\s+([A-ZÀ-Ý][a-zà-ÿ]*(?:\s+(?:de\s+|del\s+)?[A-ZÀ-Ý][a-zà-ÿ]*)*)/g;
+  let m;
+  while((m=capRe.exec(text))!==null) candidates.push(m[1].trim());
+  // 2) Respaldo: todo lo que sigue a "en " hasta puntuación, por si la ciudad no llevaba mayúscula
+  const looseRe=/\b(?:en|in)\s+([a-zA-ZÀ-ÿ0-9\s,.'-]{3,40}?)(?:[.,!?]|$)/i;
+  const loose=text.match(looseRe);
+  if(loose) candidates.push(loose[1].trim());
+  return [...new Set(candidates)];
+}
+// Busca cualquier palabra clave de plato/cocina mencionada en el mensaje
+// (reutiliza el mismo diccionario del buscador del Mapa) y devuelve los
+// términos de "cuisine" de OSM a los que hay que hacer match, o null si no
+// se menciona ningún plato/cocina concreto.
+function matchFoodKeywordsInText(text){
+  const q=text.toLowerCase();
+  let matches=[];
+  for(const key in FOOD_KEYWORDS){
+    const re=new RegExp('\\b'+key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
+    if(re.test(q)) matches.push(...FOOD_KEYWORDS[key]);
+  }
+  return matches.length?[...new Set(matches)]:null;
+}
+function buildListing(places,text){
+  const cuisineMatches=matchFoodKeywordsInText(text);
+  let pool=places;
+  let filteredNote='';
+  if(cuisineMatches){
+    const filtered=places.filter(p=>{
+      const c=(p.tags.cuisine||'').toLowerCase();
+      return cuisineMatches.some(m=>c.includes(m));
+    });
+    if(filtered.length){ pool=filtered; filteredNote=' (ya filtrados por lo que pide el usuario)'; }
+    else { filteredNote=' (ninguno etiquetado exactamente como lo pedido — son los mejores disponibles en la zona igualmente, coméntalo si recomiendas alguno)'; }
+  }
+  const top=pool.slice(0,20).map(p=>`- ${p.name} (${fmtCuisine(p.tags)||cap(p.tags.amenity)}, ★${p.score}${p.tags['addr:street']?', '+p.tags['addr:street']:''})`).join('\n');
+  return top+filteredNote;
+}
+async function findLocationContext(text){
+  const candidates=extractLocationCandidates(text);
+  for(const place of candidates){
+    try{
+      const {places}=await fetchOSMCity(place);
+      if(places.length){
+        botLastLocation=place;
+        return {place, listing:buildListing(places,text)};
+      }
+    }catch(e){/* prueba el siguiente candidato */}
+  }
+  // No se mencionó ninguna ciudad nueva en este mensaje — si ya sabíamos una
+  // de antes en esta misma conversación (p.ej. una pregunta de seguimiento
+  // tipo "¿y por 25€?"), la reutilizamos en vez de perder el contexto.
+  if(botLastLocation){
+    try{
+      const {places}=await fetchOSMCity(botLastLocation);
+      if(places.length){
+        return {place:botLastLocation, listing:buildListing(places,text)};
+      }
+    }catch(e){/* seguimos sin contexto */}
+  }
+  return null;
+}
+
+
+// Intenta sacar JSON válido de la respuesta de Claude, aunque venga con
+// texto de más alrededor (a veces el modelo no respeta "solo JSON" al pie de la letra).
+function parseJSONFromClaude(text0){
+  let text=text0.replace(/```json|```/g,'').trim();
+  const firstBracket=Math.min(...['[','{'].map(c=>{const i=text.indexOf(c);return i===-1?Infinity:i;}));
+  const lastBracket=Math.max(text.lastIndexOf(']'),text.lastIndexOf('}'));
+  if(firstBracket!==Infinity && lastBracket!==-1 && lastBracket>firstBracket){
+    text=text.slice(firstBracket,lastBracket+1);
+  }
+  try{
+    return JSON.parse(text);
+  }catch(e){
+    console.error('[GastroMap] No se pudo interpretar como JSON:',text0);
+    throw new Error('Claude devolvió una respuesta que no pude leer correctamente. Prueba de nuevo — a veces el modelo se despista con el formato.');
+  }
+}
+
+async function runIAChef(){
+  const city=document.getElementById('ia-city').value.trim();
+  if(!city){alert('Por favor introduce una ciudad');return;}
+  const budget=document.getElementById('ia-budget').value;
+  const cuisines=[...document.querySelectorAll('#ia-cuisine .selected')].map(b=>b.textContent).join(', ')||'cualquier tipo';
+  const ocasion=[...document.querySelectorAll('#ia-ocasion .selected')].map(b=>b.textContent).join(', ')||'cualquier ocasión';
+  const alergias=[...document.querySelectorAll('#ia-alergias .selected')].map(b=>b.textContent).join(', ');
+  const btn=document.getElementById('ia-btn');
+  btn.disabled=true;btn.innerHTML='✨ Buscando…';
+  const results=document.getElementById('ia-results');
+  results.innerHTML='<div class="inline-loading"><div class="spinner"></div> Generando recomendaciones con IA…</div>';
+  try{
+    let osmContext='';
+    let iaChefPool=[];
+    try{
+      const {places}=await fetchOSMCity(city);
+      if(places.length){
+        iaChefPool=places;
+        osmContext=`\n\nDatos reales de OpenStreetMap para ${city} (úsalos preferentemente):\n`+
+          places.slice(0,25).map(p=>`- ${p.name} (${fmtCuisine(p.tags)||cap(p.tags.amenity)}${p.tags['addr:street']?', '+p.tags['addr:street']:''})`).join('\n');
+      }
+    }catch(e){/* si falla OSM, seguimos sin datos reales */}
+    window.__lastIAChefPool=iaChefPool;
+    window.__lastIAChefCity=city;
+    const alergiaTexto=alergias?`\n\nIMPORTANTE — Alergias/intolerancias alimentarias del usuario: ${alergias}. Elige SOLO restaurantes que puedan ofrecer opciones seguras y sin contacto cruzado para estos alérgenos, y menciónalo explícitamente en el campo "why" de cada recomendación (qué opción segura tienen para esa alergia). Si un restaurante no puede garantizarlo, no lo incluyas.`:'';
+    const prompt=`Soy un usuario de GastroMap buscando restaurantes. Ciudad: ${city}. Presupuesto: ${budget}€ por persona. Cocina preferida: ${cuisines}. Ocasión: ${ocasion}.${osmContext}${alergiaTexto}\n\nDame exactamente 4 recomendaciones en formato JSON array: [{"name":"...","cuisine":"...","neighborhood":"...","price":"...","why":"...","emoji":"..."}]. Solo JSON, sin texto adicional.`;
+    const text0=await callClaude({system:GASTROMAP_EXPERT_PROMPT, messages:[{role:'user',content:prompt}], max_tokens:1600});
+    const recs=parseJSONFromClaude(text0);
+    window.__lastIAChefRecs=recs;
+    results.innerHTML='<div style="margin-top:8px;font-size:12px;color:var(--textl);margin-bottom:12px">✨ Recomendaciones personalizadas para '+city+'</div><div class="ia-results">'+recs.map((r,i)=>`
+      <div class="ia-rest-card" style="cursor:pointer" onclick="openRestaurantFromIA(window.__lastIAChefRecs[${i}])">
+        <div class="ia-rest-emoji">${r.emoji||'🍽'}</div>
+        <div>
+          <div class="ia-rest-name">${r.name}</div>
+          <div class="ia-rest-sub">${r.cuisine} · ${r.neighborhood} · ${r.price}</div>
+          <div style="font-size:11px;color:var(--textm);margin-top:4px;line-height:1.4">${r.why}</div>
+        </div>
+      </div>`).join('')+'</div>';
+  }catch(e){
+    results.innerHTML='<div class="ia-prose">'+(e.message||'No pude conectar con la IA en este momento. Intenta de nuevo.')+'</div>';
+  }finally{btn.disabled=false;btn.innerHTML='✨ Obtener Recomendaciones';}
+}
+// Abre la ficha de una recomendación de IA Chef: si el nombre coincide con un
+// sitio real de OpenStreetMap que ya teníamos cargado, abre su ficha completa
+// y real; si no, arma una ficha "ligera" solo con lo que la IA sabe.
+function openRestaurantFromIA(r){
+  const pool=window.__lastIAChefPool||[];
+  const match=pool.find(p=>p.name.toLowerCase().trim()===r.name.toLowerCase().trim());
+  if(match){ openRestaurantFromOSM(match); return; }
+  openRestaurant({
+    id:'ia-'+hashStr(r.name+r.neighborhood),
+    imgSeed:'ia-'+r.name, tags:{cuisine:r.cuisine},
+    name:r.name, address:(r.neighborhood?r.neighborhood+', ':'')+(window.__lastIAChefCity||''),
+    cuisine:r.cuisine, rating:'—', reviewCount:'sin datos verificados',
+    score:'—', phone:null, website:null, badges:['✨ Recomendado por IA']
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// GASTROBOT
+// ═══════════════════════════════════════════════════════════
+function newBotChat(){
+  botHistory=[];
+  botLastLocation=null;
+  document.getElementById('bot-messages').innerHTML=`<div class="bot-empty" id="bot-empty">
+    <div class="bot-empty-icon">🍽</div>
+    <div class="bot-empty-title">GastroBot a tu servicio</div>
+    <div class="bot-empty-sub">Pregúntame sobre restaurantes, itinerarios gastronómicos o recomendaciones personalizadas</div>
+    <div class="bot-suggestions">
+      <button class="bot-sugg" onclick="sendBotSugg(this)">Mejores restaurantes en Valencia</button>
+      <button class="bot-sugg" onclick="sendBotSugg(this)">Itinerario 3 días en Tokyo</button>
+      <button class="bot-sugg" onclick="sendBotSugg(this)">Cena romántica en Madrid</button>
+      <button class="bot-sugg" onclick="sendBotSugg(this)">Recomiéndame sushi en Barcelona</button>
+    </div>
+  </div>`;
+}
+function sendBotSugg(btn){document.getElementById('bot-input').value=btn.textContent;sendBot();}
+async function sendBot(){
+  if(botTyping) return;
+  const input=document.getElementById('bot-input');
+  const text=input.value.trim();
+  if(!text) return;
+  input.value='';
+  const empty=document.getElementById('bot-empty');
+  if(empty) empty.remove();
+  appendMsg('user',text);
+  botHistory.push({role:'user',content:text});
+  botTyping=true;
+  document.getElementById('bot-send').disabled=true;
+  const typingId='typing-'+Date.now();
+  const msgs=document.getElementById('bot-messages');
+  msgs.innerHTML+=`<div class="msg-row" id="${typingId}"><div class="msg-ava bot">🍽</div><div class="msg-bubble bot"><div class="msg-typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`;
+  msgs.scrollTop=msgs.scrollHeight;
+  try{
+    // Busca en OpenStreetMap si el mensaje menciona una zona, para responder con sitios reales
+    const ctx=await findLocationContext(text);
+    let system=GASTROMAP_EXPERT_PROMPT+'\n\nEres GastroBot dentro de la app GastroMap. Usa emojis de comida de forma natural.';
+    if(ctx){
+      system+=`\n\nDatos reales de OpenStreetMap para "${ctx.place}" (úsalos como base de tu respuesta, son restaurantes que existen de verdad; no inventes otros si estos cubren lo que pide el usuario):\n${ctx.listing}`;
+    } else {
+      system+='\n\nNo tienes datos verificados de OpenStreetMap para esta consulta. Puedes recomendar por tu conocimiento general con normalidad, pero si das nombres de restaurantes concretos, añade una única frase breve al final invitando a confirmar que sigue abierto antes de ir — sin repetir el aviso varias veces, sin sonar inseguro, y sin recomendar ninguna otra app o servicio de terceros.';
+    }
+    const reply=await callClaude({system, messages:botHistory, max_tokens:1500});
+    document.getElementById(typingId)?.remove();
+    appendMsg('bot',reply);
+    botHistory.push({role:'assistant',content:reply});
+    const hi=document.getElementById('bot-history');
+    if(botHistory.length===2){
+      const item=document.createElement('div');
+      item.className='bot-history-item';
+      item.textContent=text.slice(0,30)+(text.length>30?'…':'');
+      hi.appendChild(item);
+    }
+  }catch(e){
+    document.getElementById(typingId)?.remove();
+    appendMsg('bot',e.message||'Lo siento, no pude conectarme en este momento. Por favor intenta de nuevo.');
+  }finally{
+    botTyping=false;
+    document.getElementById('bot-send').disabled=false;
+    msgs.scrollTop=msgs.scrollHeight;
+  }
+}
+function appendMsg(role,text){
+  const msgs=document.getElementById('bot-messages');
+  const div=document.createElement('div');
+  div.className='msg-row '+role;
+  div.innerHTML=`<div class="msg-ava ${role}">${role==='bot'?'🍽':'M'}</div><div class="msg-bubble ${role}">${text.replace(/\n/g,'<br>')}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════
+// VIAJERO
+// ═══════════════════════════════════════════════════════════
+async function runViajero(){
+  const city=document.getElementById('viajero-city').value.trim();
+  let dias=parseInt(document.getElementById('viajero-dias').value,10);
+  if(!dias || dias<1) dias=1;
+  if(dias>30) dias=30; // limite razonable para que la respuesta de la IA no se dispare de tamaño
+  document.getElementById('viajero-dias').value=dias;
+  const preferencias=[...document.querySelectorAll('#viajero-preferencias .selected')].map(b=>b.textContent).join(', ');
+  const alergias=[...document.querySelectorAll('#viajero-alergias .selected')].map(b=>b.textContent).join(', ');
+  if(!city){alert('Por favor introduce una ciudad');return;}
+  const btn=document.getElementById('viajero-btn');
+  btn.disabled=true;btn.innerHTML='✨ Generando plan…';
+  const plan=document.getElementById('viajero-plan');
+  plan.innerHTML='<div class="inline-loading"><div class="spinner"></div> Generando itinerario gastronómico con IA…</div>';
+  try{
+    let osmContext='';
+    try{
+      const {places}=await fetchOSMCity(city);
+      if(places.length){
+        const breakfast=places.filter(p=>['cafe','bakery'].includes(p.tags.amenity)).slice(0,10);
+        const mains=places.filter(p=>['restaurant','fast_food','pub','bar'].includes(p.tags.amenity)).slice(0,20);
+        const fmt=p=>`- ${p.name} (${fmtCuisine(p.tags)||cap(p.tags.amenity)}${p.tags['addr:street']?', '+p.tags['addr:street']:''})`;
+        osmContext=`\n\nDatos reales de OpenStreetMap para ${city} (úsalos preferentemente en el plan, en vez de inventar nombres):\n`+
+          `Para desayuno (cafés/panaderías):\n${breakfast.map(fmt).join('\n')||'(sin datos específicos, usa tu criterio)'}\n\n`+
+          `Para comida/cena (restaurantes/bares):\n${mains.map(fmt).join('\n')||'(sin datos específicos, usa tu criterio)'}`;
+      }
+    }catch(e){/* si falla OSM, seguimos sin datos reales */}
+    const prefTexto=preferencias?`\n\nPreferencias del viaje: ${preferencias}. Ten esto muy en cuenta al elegir cada sitio del plan.`:'';
+    const alergiaTexto=alergias?`\n\nIMPORTANTE — Alergias/intolerancias alimentarias del usuario: ${alergias}. En cada comida del plan (desayuno, comida y cena) elige SOLO opciones que puedan garantizar una alternativa segura para estos alérgenos, y menciónalo brevemente en el campo "desc". Si un sitio no puede garantizarlo, no lo incluyas y elige otro.`:'';
+    const prompt=`Crea un plan gastronómico de ${dias} día(s) para ${city}. Para cada día proporciona desayuno, comida y cena.${osmContext}${prefTexto}${alergiaTexto}\n\nFormato JSON: [{"day":1,"title":"...","breakfast":{"name":"...","desc":"...","price":"...","neighborhood":"..."},"lunch":{"name":"...","desc":"...","price":"...","neighborhood":"..."},"dinner":{"name":"...","desc":"...","price":"...","neighborhood":"..."}}]. Solo JSON.`;
+    const text0=await callClaude({system:GASTROMAP_EXPERT_PROMPT, messages:[{role:'user',content:prompt}], max_tokens:Math.min(1200*parseInt(dias,10)+800,8000)});
+    const days=parseJSONFromClaude(text0);
+    plan.innerHTML='<div class="viajero-plan">'+days.map(d=>`
+      <div class="day-card">
+        <div class="day-header">
+          <div><div class="day-num">DÍA ${d.day}</div><div class="day-title">${d.title}</div></div>
+        </div>
+        <div class="day-body">
+          <div class="meal-row"><div class="meal-icon">☀️</div><div class="meal-content"><div class="meal-label">Desayuno</div><div class="meal-name">${d.breakfast.name}</div><div class="meal-desc">${d.breakfast.desc} · ${d.breakfast.neighborhood}</div><div class="meal-price">~${d.breakfast.price}</div></div></div>
+          <div class="meal-row"><div class="meal-icon">🌤</div><div class="meal-content"><div class="meal-label">Comida</div><div class="meal-name">${d.lunch.name}</div><div class="meal-desc">${d.lunch.desc} · ${d.lunch.neighborhood}</div><div class="meal-price">~${d.lunch.price}</div></div></div>
+          <div class="meal-row"><div class="meal-icon">🌙</div><div class="meal-content"><div class="meal-label">Cena</div><div class="meal-name">${d.dinner.name}</div><div class="meal-desc">${d.dinner.desc} · ${d.dinner.neighborhood}</div><div class="meal-price">~${d.dinner.price}</div></div></div>
+        </div>
+      </div>`).join('')+'</div>';
+  }catch(e){
+    plan.innerHTML='<div class="ia-prose">'+(e.message||'No pude generar el plan en este momento. Intenta de nuevo.')+'</div>';
+  }finally{btn.disabled=false;btn.innerHTML='✨ Generar Plan';}
+}
+
+// ═══════════════════════════════════════════════════════════
+// CREADORES
+// ═══════════════════════════════════════════════════════════
+const CREATORS=[
+  {name:'Lena Food Vibes',handle:'@lenafoodvibes',level:'foodie_pro',bio:'Trend setter gastronómica. De Copenhague al mundo. Amo lo nórdico, lo sostenible y los mercados locales.',followers:'42,000',reviews:190,cities:['Copenhague','Estocolmo','Berlín','Ámsterdam'],color:'#E8622A'},
+  {name:'Marco Italiano',handle:'@marcoitaliano',level:'verified_critic',bio:'Italiano de pura cepa. Pizza, pasta y todo lo que salga de una cocina italiana. He visitado más de 300 pizzerías.',followers:'31,200',reviews:420,cities:['Roma','Nápoles','Milán','Florencia'],color:'#1D9E75'},
+  {name:'Diego Parrilla',handle:'@diegoparrilla',level:'verified_critic',bio:'Maestro parrillero argentino. Recorro Latinoamérica buscando el mejor asado, las mejores brasas y el fuego perfecto.',followers:'27,800',reviews:345,cities:['Buenos Aires','Lima','São Paulo','Santiago'],color:'#534AB7'},
+  {name:'Carlos Tapas',handle:'@carlostapas',level:'local_expert',bio:'Experto en tapas y vinos. Sommelier certificado. Recorro España buscando la mejor tapa tradicional y el vino perfecto.',followers:'22,400',reviews:312,cities:['Sevilla','Valencia','Granada','Madrid'],color:'#C9A84C'},
+  {name:'Sakura Eats',handle:'@sakuraeats',level:'foodie_pro',bio:'Explorando la gastronomía japonesa desde Tokio. Sushi, ramen, kaiseki y todo lo que Japón tiene para ofrecer.',followers:'38,900',reviews:267,cities:['Tokyo','Osaka','Kyoto'],color:'#E24B4A'},
+  {name:'Juan Foodie',handle:'@juanfoodie',level:'verified_critic',bio:'Amante de la gastronomía mediterránea. Más de 200 restaurantes visitados en España y Francia.',followers:'19,600',reviews:198,cities:['Valencia','Barcelona','Madrid','Marsella'],color:'#0F1B2D'},
+  {name:'Amara Spice',handle:'@amaraspice',level:'verified_critic',bio:'Especialista en cocina india y del sur de Asia. Del curry callejero de Mumbai al thali más refinado de Delhi.',followers:'25,300',reviews:280,cities:['Mumbai','Delhi','Jaipur','Bangalore'],color:'#B8592E'},
+  {name:'Kofi Streetfood',handle:'@kofistreetfood',level:'local_expert',bio:'Explorando la comida callejera de África Occidental. Del jollof rice al suya, sin salir de los mercados locales.',followers:'18,700',reviews:156,cities:['Accra','Lagos','Dakar'],color:'#D68910'},
+  {name:'Elena Vino',handle:'@elenavino',level:'foodie_pro',bio:'Sumiller de formación, catadora de vocación. Recorro viñedos y bodegas de Francia e Italia buscando el maridaje perfecto.',followers:'29,500',reviews:210,cities:['Burdeos','Toscana','Piamonte','Borgoña'],color:'#7B2D26'},
+  {name:'Ben Burger',handle:'@benburger',level:'foodie',bio:'Nací en Texas y crecí entre parrillas. BBQ, hamburguesas y todo lo que lleve carne a la brasa.',followers:'21,900',reviews:189,cities:['Austin','Nashville','Kansas City','Memphis'],color:'#8B4513'},
+  {name:'Priya Thali',handle:'@priyathali',level:'verified_critic',bio:'Cocina vegetariana del sur de India. Cada thali cuenta una historia distinta según la región.',followers:'16,400',reviews:143,cities:['Chennai','Kerala','Hyderabad'],color:'#2E8B57'},
+  {name:'Wei Dumplings',handle:'@weidumplings',level:'foodie_pro',bio:'De Pekín a Shanghái, mi obsesión son los dumplings, el dim sum y la cocina regional china menos conocida fuera de Asia.',followers:'33,100',reviews:256,cities:['Pekín','Shanghái','Chengdu','Hong Kong'],color:'#C0392B'},
+  {name:'Fatima Souk',handle:'@fatimasouk',level:'local_expert',bio:'Cocina de Marruecos y Oriente Medio. Tajines, especias y los secretos de los zocos que no salen en las guías.',followers:'20,200',reviews:167,cities:['Marrakech','Fez','Beirut','Estambul'],color:'#B7950B'},
+  {name:'Noah Green',handle:'@noahgreen',level:'foodie_pro',bio:'Cocina 100% vegetal por el mundo. Demostrando que la comida vegana también puede ser alta cocina.',followers:'24,800',reviews:201,cities:['Los Ángeles','Berlín','Londres','Tel Aviv'],color:'#27AE60'},
+  {name:'Isabella Dolce',handle:'@isabelladolce',level:'foodie',bio:'Pastelera de formación, foodie de corazón. Postres, repostería y todo lo dulce que merezca la pena cruzar una ciudad.',followers:'15,600',reviews:112,cities:['París','Viena','Bruselas'],color:'#D291BC'},
+  {name:'Kai Sushi',handle:'@kaisushi',level:'verified_critic',bio:'Sushi de barrio, no solo omakase de lujo. Buscando las mejores barras de sushi que no salen en ninguna guía Michelin.',followers:'28,300',reviews:234,cities:['Tokyo','Osaka','Fukuoka'],color:'#34495E'},
+  {name:'Sofia Andes',handle:'@sofiaandes',level:'local_expert',bio:'Cocina andina y de altura. De la quinoa al cuy, recorriendo Perú, Bolivia y Ecuador en busca de sabores ancestrales.',followers:'17,900',reviews:139,cities:['Cusco','La Paz','Quito'],color:'#A0522D'},
+  {name:'Tom Craft',handle:'@tomcraft',level:'foodie',bio:'Gastropubs y cerveza artesana del Reino Unido. Fish and chips reinventado y las mejores pintas con buena comida.',followers:'14,200',reviews:98,cities:['Londres','Edimburgo','Manchester'],color:'#5D6D7E'},
+];
+const LEVEL_LABELS={foodie:'🍴 Foodie',foodie_pro:'🏅 Foodie Pro',local_expert:'🌐 Experto Local',verified_critic:'🛡 Crítico Verificado'};
+const LEVEL_CLASS={foodie:'level-foodie',foodie_pro:'level-pro',local_expert:'level-expert',verified_critic:'level-critic'};
+let following=new Set();
+function renderCreators(filter='all',search=''){
+  const grid=document.getElementById('creators-grid');
+  let data=CREATORS.filter(c=>(filter==='all'||c.level===filter)&&(c.name.toLowerCase().includes(search.toLowerCase())||c.handle.includes(search.toLowerCase())));
+  grid.innerHTML=data.map(c=>`
+    <div class="creator-card" onclick="openCreatorProfile('${c.handle}')" style="cursor:pointer">
+      <div class="creator-top">
+        <img class="creator-ava" ${avatarImgAttrs(c.handle,c.name)} alt="${c.name}" style="object-fit:cover">
+        <div>
+          <div class="creator-name">${c.name} ${c.level==='verified_critic'||c.level==='local_expert'?'✓':''}</div>
+          <div class="creator-handle">${c.handle}</div>
+          <div class="creator-level-badge ${LEVEL_CLASS[c.level]}">${LEVEL_LABELS[c.level]}</div>
+        </div>
+      </div>
+      <div class="creator-bio">${c.bio}</div>
+      <div class="creator-stats-row">
+        <div class="cstat"><div class="cstat-num">${c.followers}</div><div class="cstat-lbl">seguidores</div></div>
+        <div class="cstat"><div class="cstat-num">★ ${c.reviews}</div><div class="cstat-lbl">reseñas</div></div>
+      </div>
+      <div class="creator-cities">${c.cities.map(ci=>`<span class="city-tag">📍 ${ci}</span>`).join('')}</div>
+      <button class="follow-btn ${following.has(c.handle)?'following':''}" onclick="event.stopPropagation();toggleFollow(this,'${c.handle}')">${following.has(c.handle)?'✓ Siguiendo':'Seguir'}</button>
+    </div>`).join('');
+}
+function toggleFollow(btn,handle){
+  if(following.has(handle)){following.delete(handle);btn.textContent='Seguir';btn.classList.remove('following');}
+  else{following.add(handle);btn.textContent='✓ Siguiendo';btn.classList.add('following');}
+}
+function filterCreators(q){renderCreators(document.querySelector('.level-tab.active')?.dataset?.level||'all',q)}
+function filterCreatorLevel(btn,level){
+  document.querySelectorAll('.level-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); btn.dataset.level=level;
+  renderCreators(level);
+}
+
+// ═══════════════════════════════════════════════════════════
+// PERFIL DE CREADOR
+// ═══════════════════════════════════════════════════════════
+function creatorPoints(c){
+  return (c.reviews*15 + Math.round(parseInt(c.followers.replace(/,/g,''))/40)).toLocaleString('es-ES');
+}
+function creatorCuisineKeyword(c){
+  const b=(c.bio+' '+c.name).toLowerCase();
+  const map=[
+    [/pizza|italian/,'italian'],[/parrilla|bbq|asado|texas/,'bbq'],[/tapas|españ|mediterrán/,'spanish'],
+    [/japon|sushi|tokio|tokyo/,'japanese'],[/india|curry|thali/,'indian'],[/china|dumpling|dim sum/,'chinese'],
+    [/marroqu|tajine|zoco|oriente medio/,'moroccan'],[/vegan|vegetal/,'vegan'],[/postre|dulce|pastel/,'dessert'],
+    [/andina|per[uú]|quinoa/,'peruvian'],[/cerveza|pub|fish and chips/,'pub'],[/vino|sumiller|bodega/,'wine'],
+    [/n[oó]rdic|copenhague|estocolmo/,'nordic'],[/[aá]frica|jollof|suya/,'african'],[/m[eé]xic/,'mexican']
+  ];
+  for(const [re,kw] of map){ if(re.test(b)) return kw; }
+  return 'restaurant';
+}
+const REC_NAME_TEMPLATES=[
+  city=>`Sabores de ${city}`, city=>`El Rincón de ${city}`, city=>`Casa ${city}`,
+  city=>`${city} Kitchen`, city=>`La Mesa de ${city}`, city=>`Taller ${city}`,
+  city=>`Mercado ${city}`, city=>`${city} Social Club`, city=>`La Cantina de ${city}`, city=>`${city} Bistró`
+];
+const REC_DESC_TEMPLATES=[
+  n=>`Uno de mis sitios de cabecera. ${n} nunca falla.`,
+  n=>`Descubrí ${n} hace tiempo y desde entonces vuelvo siempre que puedo.`,
+  n=>`${n} es parada obligatoria si pasas por aquí.`,
+  n=>`La relación calidad-precio de ${n} es difícil de superar.`,
+  n=>`${n} tiene el ambiente perfecto para repetir una y otra vez.`,
+  n=>`Lo que hacen en ${n} no se encuentra en ninguna otra parte de la ciudad.`
+];
+function generateCreatorRecommendations(c){
+  return c.cities.map((city,i)=>{
+    const h=hashStr(c.handle+city+i);
+    const name=REC_NAME_TEMPLATES[h%REC_NAME_TEMPLATES.length](city);
+    const desc=REC_DESC_TEMPLATES[Math.floor(h/7)%REC_DESC_TEMPLATES.length](name);
+    return {name,city,score:70+(h%31),desc,id:'rec-'+c.handle+'-'+i};
+  });
+}
+const POST_CAPTION_TEMPLATES=[
+  city=>`Un día explorando ${city} en busca del próximo sitio favorito 📍`,
+  city=>`${city} nunca deja de sorprenderme 🔥`,
+  city=>`De ruta gastronómica por ${city}, esto solo acaba de empezar 🍽️`,
+  city=>`Sesión de fotos de hoy en ${city} 📸`,
+  ()=>`Cuando encuentras el plato perfecto, lo sabes al primer bocado 🤌`,
+  city=>`Otra semana, otra excusa para volver a ${city} 😋`
+];
+function generateCreatorPosts(c){
+  const pool=c.cities.length>=6?c.cities:[...c.cities,...c.cities,...c.cities];
+  return pool.slice(0,6).map((city,i)=>{
+    const h=hashStr(c.handle+'post'+city+i);
+    const caption=POST_CAPTION_TEMPLATES[h%POST_CAPTION_TEMPLATES.length](city);
+    return { caption, city, likes:(1+(h%40))+'.'+(h%10)+'K', comments:20+(h%480), id:'post-'+c.handle+'-'+i };
+  });
+}
+function openCreatorProfile(handle){
+  const c=CREATORS.find(cr=>cr.handle===handle);
+  if(!c) return;
+  const kw=creatorCuisineKeyword(c);
+  const recs=generateCreatorRecommendations(c);
+  const posts=generateCreatorPosts(c);
+  window.__lastCreatorRecs=recs;
+  const points=creatorPoints(c);
+  document.getElementById('creador-perfil-body').innerHTML=`
+    <button class="detail-back" onclick="showPageDirect('creadores')">← Volver a creadores</button>
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;margin:24px 0">
+      <img ${avatarImgAttrs(c.handle,c.name)} alt="${c.name}" style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:3px solid var(--orange);flex-shrink:0">
+      <div style="flex:1;min-width:260px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <h1 style="font-family:var(--serif);font-size:32px;margin:0">${c.name}</h1>
+          ${c.level==='verified_critic'||c.level==='local_expert'?'<span style="color:#3B82F6;font-size:22px">🛡</span>':''}
+        </div>
+        <div class="creator-level-badge ${LEVEL_CLASS[c.level]}" style="display:inline-block;margin:8px 0">${LEVEL_LABELS[c.level]}</div>
+        <div style="font-size:14px;color:var(--textm);line-height:1.6;max-width:520px;margin-bottom:16px">${c.bio}</div>
+        <div style="display:flex;gap:32px;margin-bottom:16px">
+          <div><div style="font-size:22px;font-weight:700">${c.reviews}</div><div style="font-size:12px;color:var(--textl)">reseñas</div></div>
+          <div><div style="font-size:22px;font-weight:700">${c.followers}</div><div style="font-size:12px;color:var(--textl)">seguidores</div></div>
+          <div><div style="font-size:22px;font-weight:700">${points}</div><div style="font-size:12px;color:var(--textl)">puntos</div></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <span class="tag" style="background:#FCE7F3;color:#BE185D">📷 ${c.handle}</span>
+          <span class="tag" style="background:#F3F4F6;color:#374151">🎵 ${c.handle}</span>
+          <span class="tag" style="background:#FEE2E2;color:#B91C1C">▶ ${c.handle}</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${c.cities.map(ci=>`<span class="tag">📍 ${ci}</span>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="profile-nav" style="margin-top:8px">
+      <button class="profile-nav-item active" id="creator-tab-btn-posts" onclick="switchCreatorTab('posts')">📷 Publicaciones</button>
+      <button class="profile-nav-item" id="creator-tab-btn-recs" onclick="switchCreatorTab('recs')">⭐ Recomendaciones</button>
+    </div>
+    <div id="creator-tab-posts" style="margin-top:20px">
+      <div class="cards-grid">
+        ${posts.map((p,i)=>`
+          <div class="rest-card">
+            <div class="card-img">
+              <img ${foodImgAttrs({cuisine:kw},'cpost-'+c.handle+'-'+i,400,300)} alt="${p.caption}" style="width:100%;height:100%;object-fit:cover">
+            </div>
+            <div class="card-body">
+              <div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:8px">${p.caption}</div>
+              <div style="display:flex;gap:16px;font-size:12px;color:var(--textl)">
+                <span>❤️ ${p.likes}</span><span>💬 ${p.comments}</span><span>📍 ${p.city}</span>
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div id="creator-tab-recs" style="display:none;margin-top:20px">
+      <div class="cards-grid">
+        ${recs.map((r,i)=>`
+          <div class="rest-card" onclick="openCreatorRecommendation(${i})" style="cursor:pointer">
+            ${i===0?`<div class="card-img"><img ${foodImgAttrs({cuisine:kw},'crec-'+c.handle+'-'+i,400,300)} alt="${r.name}" style="width:100%;height:100%;object-fit:cover"></div>`:''}
+            <div class="card-body">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span style="color:#fff;font-weight:700;font-size:12px;padding:3px 9px;border-radius:20px;background:#1D9E75">${r.score}</span>
+                <span style="font-weight:700;font-size:15px">${r.name}</span>
+              </div>
+              <div style="font-size:12px;color:var(--textl);margin-bottom:8px">📍 ${r.city}</div>
+              <div style="font-size:13px;color:var(--textm);line-height:1.5;margin-bottom:8px">${r.desc}</div>
+              <div style="font-size:12px;color:#3B82F6">🛡 Visita verificada</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+  `;
+  showPageDirect('creador-perfil');
+  window.scrollTo(0,0);
+}
+function switchCreatorTab(tab){
+  document.getElementById('creator-tab-posts').style.display = tab==='posts'?'block':'none';
+  document.getElementById('creator-tab-recs').style.display = tab==='recs'?'block':'none';
+  document.getElementById('creator-tab-btn-posts').classList.toggle('active',tab==='posts');
+  document.getElementById('creator-tab-btn-recs').classList.toggle('active',tab==='recs');
+}
+function openCreatorRecommendation(i){
+  const r=(window.__lastCreatorRecs||[])[i];
+  if(!r) return;
+  openRestaurant({
+    id:r.id, imgSeed:r.id, tags:{}, name:r.name, address:r.city, cuisine:'Recomendado por creador',
+    rating:(r.score/20).toFixed(1), reviewCount:'—', score:r.score, phone:null, website:null, badges:['🛡 Visita verificada']
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// PERFIL
+// ═══════════════════════════════════════════════════════════
+function profileTab(btn,tab){
+  document.querySelectorAll('.profile-nav-item').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['rep','foodprint','favs','niveles'].forEach(t=>{
+    const el=document.getElementById('profile-tab-'+t);
+    if(el) el.style.display=t===tab?'block':'none';
+  });
+  if(tab==='favs') renderFavs();
+  if(tab==='foodprint') renderFoodprint();
+}
+
+// ═══════════════════════════════════════════════════════════
+// FOODPRINT — tu diario gastronómico
+// ═══════════════════════════════════════════════════════════
+const MASTER_CUISINES=['Italiana','Japonesa','Mexicana','Española','Francesa','India','China','Tailandesa','Coreana','Griega','Turca','Vietnamita','Peruana','Libanesa','Marroquí','Etíope'];
+function renderFoodprint(){
+  const body=document.getElementById('foodprint-body');
+  if(!favorites.length){
+    body.innerHTML='<div class="empty-state"><div class="empty-icon">👣</div><div class="empty-title">Tu Foodprint está vacío</div><div class="empty-sub">Guarda restaurantes desde Explorar o el Mapa y aquí verás tus patrones — qué cocinas repites, cuáles te faltan por probar.</div></div>';
+    return;
+  }
+  // Cuenta por tipo de cocina (normaliza "Italiana Contemporánea" -> "Italiana", etc.)
+  const counts={};
+  favorites.forEach(f=>{
+    const raw=(f.cuisine||'Otros').split(/[,·]/)[0].trim();
+    const known=MASTER_CUISINES.find(c=>raw.toLowerCase().includes(c.toLowerCase()));
+    const key=known||raw||'Otros';
+    counts[key]=(counts[key]||0)+1;
+  });
+  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const maxCount=sorted[0]?.[1]||1;
+  const triedNames=new Set(sorted.map(([name])=>name.toLowerCase()));
+  const notTried=MASTER_CUISINES.filter(c=>!triedNames.has(c.toLowerCase())).slice(0,6);
+
+  body.innerHTML=`
+    <div class="rep-card">
+      <div class="rep-header">👣 Tu Foodprint</div>
+      <div class="stats-grid">
+        <div class="stat-cell"><div class="stat-cell-num">${favorites.length}</div><div class="stat-cell-lbl">Locales guardados</div></div>
+        <div class="stat-cell"><div class="stat-cell-num">${sorted.length}</div><div class="stat-cell-lbl">Cocinas distintas</div></div>
+      </div>
+    </div>
+    <div class="rep-card">
+      <div class="rep-header">🍽 Cocinas que más repites</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${sorted.slice(0,8).map(([name,count])=>`
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--textm);margin-bottom:4px"><span>${name}</span><span>${count}</span></div>
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:${Math.round(count/maxCount*100)}%"></div></div>
+          </div>`).join('')}
+      </div>
+    </div>
+    ${notTried.length?`
+    <div class="rep-card">
+      <div class="rep-header">🗺 Cocinas por descubrir</div>
+      <div style="font-size:12px;color:var(--textl);margin-bottom:12px">Todavía no has guardado ningún sitio de estas cocinas — prueba a buscarlas en Explorar.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${notTried.map(c=>`<span class="tag" style="cursor:pointer" onclick="showPageDirect('explorar')" title="Ir a Explorar">${c}</span>`).join('')}
+      </div>
+    </div>`:''}
+    <div class="rep-card">
+      <div class="rep-header">✨ Insight con IA</div>
+      <div id="foodprint-ai-insight">
+        <button class="btn-ia" onclick="generateFoodprintInsight()">✨ Analizar mis patrones</button>
+        <div style="font-size:11px;color:var(--textl);margin-top:8px">Esto hace una llamada a la IA (consume algo de tu saldo de API).</div>
+      </div>
+    </div>`;
+}
+async function generateFoodprintInsight(){
+  const el=document.getElementById('foodprint-ai-insight');
+  el.innerHTML='<div class="inline-loading"><div class="spinner"></div> Analizando tus patrones…</div>';
+  try{
+    const summary=favorites.map(f=>`${f.name} (${f.cuisine||'?'}, ${f.city})`).join('; ');
+    const prompt=`Aquí tienes la lista de restaurantes que un usuario ha guardado como favoritos en GastroMap: ${summary}. Escribe un análisis breve (3-4 frases, tono cercano y curioso, en español) de sus patrones gastronómicos: qué tipo de cocina repite, qué podría explorar que aún no ha probado, y una sugerencia concreta. No uses formato de lista, solo un párrafo natural.`;
+    const insight=await callClaude({system:GASTROMAP_EXPERT_PROMPT,messages:[{role:'user',content:prompt}]});
+    el.innerHTML=`<div class="ia-prose">${insight}</div><button class="btn-ia" style="margin-top:12px" onclick="generateFoodprintInsight()">🔄 Regenerar</button>`;
+  }catch(e){
+    el.innerHTML='<div class="ia-prose">'+(e.message||'No se pudo generar el análisis.')+'</div><button class="btn-ia" style="margin-top:12px" onclick="generateFoodprintInsight()">Reintentar</button>';
+  }
+}
+function renderPerfil(){updateFavCount();}
+
+// ═══════════════════════════════════════════════════════════
+// AJUSTES
+// ═══════════════════════════════════════════════════════════
+
+// --- Alergias por defecto ---
+function saveDefaultAllergies(){
+  const selected=[...document.querySelectorAll('#ajustes-alergias .selected')].map(b=>b.textContent);
+  localStorage.setItem('gm_default_allergies',JSON.stringify(selected));
+}
+function loadDefaultAllergiesIntoAjustes(){
+  const saved=JSON.parse(localStorage.getItem('gm_default_allergies')||'[]');
+  document.querySelectorAll('#ajustes-alergias .chip-opt').forEach(btn=>{
+    btn.classList.toggle('selected',saved.includes(btn.textContent));
+  });
+}
+let iaDefaultsApplied=false, viajeroDefaultsApplied=false;
+function applyDefaultAllergiesToForm(containerId){
+  const saved=JSON.parse(localStorage.getItem('gm_default_allergies')||'[]');
+  if(!saved.length) return;
+  document.querySelectorAll('#'+containerId+' .chip-opt').forEach(btn=>{
+    if(saved.includes(btn.textContent)) btn.classList.add('selected');
+  });
+}
+
+// --- Idioma ---
+const TRANSLATIONS={
+  es:{
+    nav_explorar:'Explorar', nav_mapa:'Mapa', nav_tendencias:'Tendencias', nav_listas:'Listas', nav_ia:'IA Chef',
+    nav_creadores:'Creadores', nav_viajero:'Viajero', nav_gastrobot:'GastroBot', nav_ajustes:'Ajustes', nav_perfil:'Perfil',
+    ajustes_title:'⚙️ Ajustes', ajustes_sub:'Gestiona tu perfil y tus preferencias',
+    ajustes_perfil:'Perfil', ajustes_perfil_note:'⚠️ Vista previa — se guarda solo en este navegador. Cuando exista un sistema de cuentas, esto pasará a ser tu perfil real y sincronizado.',
+    ajustes_nombre:'Nombre completo', ajustes_email:'Email', ajustes_rol:'Rol',
+    ajustes_alergias:'Alergias e intolerancias por defecto', ajustes_alergias_note:'Se autorrellenarán en IA Chef y Modo Viajero para que no tengas que marcarlas cada vez.',
+    ajustes_idioma:'Idioma de la aplicación', ajustes_idioma_note:'Traduce el menú y las pantallas principales. El contenido generado (búsquedas, IA, restaurantes) sigue en su idioma original por ahora.',
+    ajustes_apariencia:'Apariencia', ajustes_modo_oscuro:'Modo oscuro', ajustes_modo_oscuro_sub:'Cambia la interfaz a colores oscuros',
+    ajustes_cuenta:'Cuenta', ajustes_borrar_datos:'Borrar mis datos guardados', ajustes_sign_out:'Sign Out'
+  },
+  en:{
+    nav_explorar:'Explore', nav_mapa:'Map', nav_tendencias:'Trending', nav_listas:'Lists', nav_ia:'AI Chef',
+    nav_creadores:'Creators', nav_viajero:'Traveler', nav_gastrobot:'GastroBot', nav_ajustes:'Settings', nav_perfil:'Profile',
+    ajustes_title:'⚙️ Settings', ajustes_sub:'Manage your profile and preferences',
+    ajustes_perfil:'Profile', ajustes_perfil_note:"⚠️ Preview only — saved just in this browser. Once real accounts exist, this becomes your real, synced profile.",
+    ajustes_nombre:'Full name', ajustes_email:'Email', ajustes_rol:'Role',
+    ajustes_alergias:'Default allergies & intolerances', ajustes_alergias_note:"They'll auto-fill in AI Chef and Traveler Mode so you don't have to select them every time.",
+    ajustes_idioma:'App language', ajustes_idioma_note:"Translates the menu and main screens. Generated content (searches, AI, restaurants) still shows in its original language for now.",
+    ajustes_apariencia:'Appearance', ajustes_modo_oscuro:'Dark mode', ajustes_modo_oscuro_sub:'Switch the interface to dark colors',
+    ajustes_cuenta:'Account', ajustes_borrar_datos:'Clear my saved data', ajustes_sign_out:'Sign Out'
+  }
+};
+function setLanguage(lang){
+  localStorage.setItem('gm_lang',lang);
+  applyTranslations();
+}
+function applyTranslations(){
+  const lang=localStorage.getItem('gm_lang')||'es';
+  const dict=TRANSLATIONS[lang]||TRANSLATIONS.es;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key=el.getAttribute('data-i18n');
+    if(dict[key]) el.textContent=dict[key];
+  });
+  const sel=document.getElementById('ajustes-idioma');
+  if(sel) sel.value=lang;
+}
+
+// --- Apariencia ---
+function toggleDarkMode(on){
+  document.body.classList.toggle('dark-mode',on);
+  localStorage.setItem('gm_dark_mode',on?'1':'0');
+  updateDarkSliderVisual(on);
+}
+function updateDarkSliderVisual(on){
+  const slider=document.getElementById('ajustes-dark-slider');
+  if(!slider) return;
+  slider.style.background=on?'var(--orange)':'var(--g3)';
+  slider.innerHTML=`<span style="position:absolute;height:18px;width:18px;left:${on?'23px':'3px'};bottom:3px;background:white;border-radius:50%;transition:0.2s"></span>`;
+}
+function loadDarkModePref(){
+  const on=localStorage.getItem('gm_dark_mode')==='1';
+  document.body.classList.toggle('dark-mode',on);
+  const toggle=document.getElementById('ajustes-dark-toggle');
+  if(toggle) toggle.checked=on;
+  updateDarkSliderVisual(on);
+}
+
+// --- Borrar datos ---
+function clearMyData(){
+  if(!confirm('Esto borra tus favoritos, tu Foodprint y tus preferencias guardadas en este navegador. No se puede deshacer. ¿Continuar?')) return;
+  localStorage.removeItem('gm_favs');
+  localStorage.removeItem('gm_default_allergies');
+  favorites=[];
+  updateFavCount();
+  loadDefaultAllergiesIntoAjustes();
+  alert('Listo, tus datos guardados en este navegador se han borrado.');
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+updateFavCount();
+renderGlobalTop();
+loadCurrentUser();
+loadDefaultAllergiesIntoAjustes();
+loadDarkModePref();
+applyTranslations();
+</script>
+</body>
+</html>

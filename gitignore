@@ -1,0 +1,5 @@
+.env
+node_modules/
+extract.osm.pbf
+app.sqlite
+*.log
