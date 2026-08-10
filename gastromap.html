@@ -917,6 +917,16 @@ a{text-decoration:none;color:inherit}
 </div>
 
 <!-- ═══════════════════════════════ AJUSTES ═══════════════════════════════ -->
+<!-- ═══════════════════════════════ AVISO DE INICIO DE SESIÓN ═══════════════════════════════ -->
+<div id="login-prompt-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:5000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--white);border-radius:16px;padding:28px;max-width:340px;width:100%;text-align:center;box-shadow:var(--shadow2)">
+    <div style="font-size:36px;margin-bottom:12px">🔐</div>
+    <div id="login-prompt-message" style="font-size:15px;color:var(--text);margin-bottom:20px;line-height:1.5"></div>
+    <button class="btn-ia" onclick="goToLoginFromPrompt()">Iniciar sesión / Registrarse</button>
+    <button style="margin-top:10px;background:none;border:none;color:var(--textl);font-size:13px;cursor:pointer;display:block;width:100%" onclick="closeLoginPrompt()">Ahora no</button>
+  </div>
+</div>
+
 <div id="page-ajustes" class="page">
   <div style="max-width:640px;margin:0 auto;padding:32px 24px">
     <div style="font-family:var(--serif);font-size:28px;font-weight:700;margin-bottom:4px" data-i18n="ajustes_title">⚙️ Ajustes</div>
@@ -1742,8 +1752,23 @@ function clearMapMarkers(){
 // ═══════════════════════════════════════════════════════════
 // FAVORITOS
 // ═══════════════════════════════════════════════════════════
+function showLoginPrompt(message){
+  document.getElementById('login-prompt-message').textContent=message;
+  document.getElementById('login-prompt-overlay').style.display='flex';
+}
+function closeLoginPrompt(){
+  document.getElementById('login-prompt-overlay').style.display='none';
+}
+function goToLoginFromPrompt(){
+  closeLoginPrompt();
+  authView='login';
+  showPageDirect('ajustes');
+  renderAuthUI();
+  window.scrollTo(0,0);
+}
 function toggleFav(evt,detail){
   evt.stopPropagation();
+  if(!currentUser){ showLoginPrompt('Inicia sesión o regístrate para guardar favoritos.'); return; }
   const btn=evt.currentTarget;
   const idx=favorites.findIndex(f=>f.id===detail.id);
   if(idx>=0){favorites.splice(idx,1);btn.textContent='♡';btn.classList.remove('saved');}
@@ -2186,7 +2211,7 @@ function renderReviewForm(){
   const area=document.getElementById('review-form-area');
   if(!area) return;
   if(!currentUser){
-    area.innerHTML=`<h3>Deja tu reseña</h3><div style="font-size:13px;color:var(--textm);margin-bottom:12px">Inicia sesión para poder opinar sobre este restaurante.</div><button class="btn-ia" onclick="showPage('ajustes')">🔐 Iniciar sesión</button>`;
+    area.innerHTML=`<h3>Deja tu reseña</h3><div style="font-size:13px;color:var(--textm);margin-bottom:12px">Inicia sesión para poder opinar sobre este restaurante.</div><button class="btn-ia" onclick="showLoginPrompt('Inicia sesión o regístrate para publicar reseñas.')">🔐 Iniciar sesión</button>`;
     return;
   }
   selectedReviewStars=0;
@@ -2198,7 +2223,7 @@ function renderReviewForm(){
   `;
 }
 async function submitReview(){
-  if(!currentUser){ alert('Inicia sesión primero.'); return; }
+  if(!currentUser){ showLoginPrompt('Inicia sesión o regístrate para publicar reseñas.'); return; }
   const d=window.__lastDetailD;
   if(!d) return;
   if(selectedReviewStars<1){ alert('Elige una puntuación de estrellas.'); return; }
