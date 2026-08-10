@@ -584,6 +584,8 @@ a{text-decoration:none;color:inherit}
 .leaflet-tooltip.restaurant-tooltip::before{border-top-color:var(--white)}
 
 .nav-hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;padding:6px 10px;color:var(--text);flex-shrink:0}
+.nav-premium-badge{background:var(--orange);color:#fff;border:none;border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0}
+.nav-premium-badge:hover{opacity:0.88}
 @media(max-width:768px){
   .nav-hamburger{display:block}
   .nav-links{
@@ -628,9 +630,20 @@ a{text-decoration:none;color:inherit}
     <button class="nav-link" onclick="showPage('ajustes')"><span class="icon">⚙️</span> <span data-i18n="nav_ajustes">Ajustes</span></button>
   </div>
   <div class="nav-right">
+    <button class="nav-premium-badge" onclick="showPremiumPrompt()">⚡ Premium</button>
     <div class="nav-avatar" id="nav-avatar" onclick="openProfileOrLogin()" style="cursor:pointer">?</div>
   </div>
 </nav>
+
+<!-- ═══════════════════════════════ AVISO PREMIUM ═══════════════════════════════ -->
+<div id="premium-prompt-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:5000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--white);border-radius:16px;padding:28px;max-width:340px;width:100%;text-align:center;box-shadow:var(--shadow2)">
+    <div style="font-size:36px;margin-bottom:12px">⚡</div>
+    <div style="font-family:var(--serif);font-size:20px;font-weight:700;margin-bottom:8px">GastroMap Premium</div>
+    <div style="font-size:14px;color:var(--textm);margin-bottom:20px;line-height:1.5">Las funcionalidades premium todavía no están lanzadas. Estamos trabajando en ellas — vuelve pronto.</div>
+    <button class="btn-ia" onclick="closePremiumPrompt()">Entendido</button>
+  </div>
+</div>
 
 <!-- ═══════════════════════════════ EXPLORAR ═══════════════════════════════ -->
 <div id="page-explorar" class="page active">
@@ -1800,6 +1813,12 @@ function clearMapMarkers(){
 function showLoginPrompt(message){
   document.getElementById('login-prompt-message').textContent=message;
   document.getElementById('login-prompt-overlay').style.display='flex';
+}
+function showPremiumPrompt(){
+  document.getElementById('premium-prompt-overlay').style.display='flex';
+}
+function closePremiumPrompt(){
+  document.getElementById('premium-prompt-overlay').style.display='none';
 }
 function closeLoginPrompt(){
   document.getElementById('login-prompt-overlay').style.display='none';
