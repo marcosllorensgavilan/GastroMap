@@ -118,25 +118,52 @@ function requireAuth(req, res, next) {
 // ═══════════════════════════════════════════════════════════════
 // AUTENTICACIÓN
 // ═══════════════════════════════════════════════════════════════
+const dns = require('dns').promises;
+const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Comprueba que el dominio del email pueda recibir correo de verdad (tiene
+// registros MX válidos), sin enviar ningún email real ni depender de ningún
+// servicio externo. Esto pilla dominios inventados o con erratas
+// (p.ej. "gmial.con"), aunque no confirma que la persona sea dueña de esa
+// bandeja de entrada — para eso haría falta un código enviado de verdad.
+async function domainCanReceiveEmail(email) {
+  const domain = email.split('@')[1];
+  if (!domain) return false;
+  try {
+    const records = await dns.resolveMx(domain);
+    return records && records.length > 0;
+  } catch (e) {
+    return false; // dominio no existe o no tiene servidor de correo
+  }
+}
+
 app.post('/api/auth/register', async (req, res) => {
   const { email, password, name } = req.body || {};
   if (!email || !password || !name) {
     return res.status(400).json({ error: 'Faltan email, contraseña o nombre.' });
   }
+  const cleanEmail = email.toLowerCase().trim();
+  if (!EMAIL_FORMAT_RE.test(cleanEmail)) {
+    return res.status(400).json({ error: 'Ese email no tiene un formato válido.' });
+  }
   if (password.length < 6) {
     return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
   }
-  const existing = appDb.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase().trim());
+  const canReceive = await domainCanReceiveEmail(cleanEmail);
+  if (!canReceive) {
+    return res.status(400).json({ error: 'Ese dominio de email no parece existir o no puede recibir correos. Revisa que esté bien escrito.' });
+  }
+  const existing = appDb.prepare('SELECT id FROM users WHERE email = ?').get(cleanEmail);
   if (existing) {
     return res.status(409).json({ error: 'Ya existe una cuenta con ese email.' });
   }
   const hash = await bcrypt.hash(password, 10);
   const info = appDb.prepare('INSERT INTO users (email, password_hash, name, created_at) VALUES (?,?,?,?)')
-    .run(email.toLowerCase().trim(), hash, name.trim(), new Date().toISOString());
+    .run(cleanEmail, hash, name.trim(), new Date().toISOString());
   const token = newToken();
   appDb.prepare('INSERT INTO sessions (token, user_id, created_at) VALUES (?,?,?)')
     .run(token, info.lastInsertRowid, new Date().toISOString());
-  res.json({ token, user: { id: info.lastInsertRowid, email: email.toLowerCase().trim(), name: name.trim() } });
+  res.json({ token, user: { id: info.lastInsertRowid, email: cleanEmail, name: name.trim() } });
 });
 
 app.post('/api/auth/login', async (req, res) => {
