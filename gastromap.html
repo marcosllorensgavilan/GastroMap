@@ -602,10 +602,9 @@ a{text-decoration:none;color:inherit}
     <button class="nav-link" onclick="showPage('viajero')"><span class="icon">✈️</span> <span data-i18n="nav_viajero">Viajero</span></button>
     <button class="nav-link" onclick="showPage('gastrobot')"><span class="icon">🤖</span> <span data-i18n="nav_gastrobot">GastroBot</span></button>
     <button class="nav-link" onclick="showPage('ajustes')"><span class="icon">⚙️</span> <span data-i18n="nav_ajustes">Ajustes</span></button>
-    <button class="nav-link" onclick="showPage('perfil')"><span class="icon">👤</span> <span data-i18n="nav_perfil">Perfil</span></button>
   </div>
   <div class="nav-right">
-    <div class="nav-avatar">M</div>
+    <div class="nav-avatar" id="nav-avatar" onclick="openProfileOrLogin()" style="cursor:pointer">?</div>
   </div>
 </nav>
 
@@ -920,7 +919,7 @@ a{text-decoration:none;color:inherit}
       <div id="ajustes-auth-area"></div>
     </div>
 
-    <div class="rep-card" style="margin-bottom:16px">
+    <div class="rep-card" style="margin-bottom:16px" id="ajustes-alergias-card">
       <div class="rep-header">⚠️ <span data-i18n="ajustes_alergias">Alergias e intolerancias por defecto</span></div>
       <div style="font-size:11px;color:var(--textl);margin-bottom:12px" data-i18n="ajustes_alergias_note">Se autorrellenarán en IA Chef y Modo Viajero para que no tengas que marcarlas cada vez.</div>
       <div class="chips-select" id="ajustes-alergias">
@@ -965,11 +964,14 @@ a{text-decoration:none;color:inherit}
       </div>
     </div>
 
-    <div class="rep-card">
+    <div class="rep-card" id="ajustes-cuenta-card">
       <div class="rep-header">🔐 <span data-i18n="ajustes_cuenta">Cuenta</span></div>
       <div style="display:flex;flex-direction:column;gap:10px">
         <button class="btn-ia" style="background:var(--white);color:var(--text);border:1px solid var(--g2)" onclick="clearMyData()">🗑️ <span data-i18n="ajustes_borrar_datos">Borrar mis datos guardados</span></button>
       </div>
+    </div>
+    <div class="rep-card" id="ajustes-guest-note" style="display:none">
+      <div style="font-size:13px;color:var(--textl);text-align:center;padding:8px">👤 Crea una cuenta arriba para desbloquear tus alergias guardadas, borrar tus datos y ver tu perfil.</div>
     </div>
   </div>
 </div>
@@ -1923,8 +1925,13 @@ function showPageDirect(id){
   document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   const links=[...document.querySelectorAll('.nav-link')];
-  const map={'explorar':0,'mapa':1,'tendencias':2,'listas':3,'ia':4,'creadores':5,'viajero':6,'gastrobot':7,'ajustes':8,'perfil':9};
+  const map={'explorar':0,'mapa':1,'tendencias':2,'listas':3,'ia':4,'creadores':5,'viajero':6,'gastrobot':7,'ajustes':8};
   if(links[map[id]]) links[map[id]].classList.add('active');
+  if(id==='perfil') renderPerfil();
+}
+function openProfileOrLogin(){
+  if(currentUser){ showPageDirect('perfil'); }
+  else{ authView='login'; showPageDirect('ajustes'); renderAuthUI(); window.scrollTo(0,0); }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2221,6 +2228,12 @@ let authView='login'; // 'login' o 'register'
 function switchAuthView(view){ authView=view; renderAuthUI(); }
 function updateProfileHero(){
   const nameEl=document.getElementById('pfl-name'), emailEl=document.getElementById('pfl-email'), avaEl=document.getElementById('pfl-avatar');
+  const navAvaEl=document.getElementById('nav-avatar');
+  if(currentUser){
+    if(navAvaEl) navAvaEl.textContent=currentUser.name.charAt(0).toUpperCase();
+  }else{
+    if(navAvaEl) navAvaEl.textContent='?';
+  }
   if(!nameEl) return;
   if(currentUser){
     nameEl.textContent=currentUser.name;
@@ -2235,6 +2248,12 @@ function updateProfileHero(){
 }
 function renderAuthUI(){
   updateProfileHero();
+  const alergiasCard=document.getElementById('ajustes-alergias-card');
+  const cuentaCard=document.getElementById('ajustes-cuenta-card');
+  const guestNote=document.getElementById('ajustes-guest-note');
+  if(alergiasCard) alergiasCard.style.display=currentUser?'block':'none';
+  if(cuentaCard) cuentaCard.style.display=currentUser?'block':'none';
+  if(guestNote) guestNote.style.display=currentUser?'none':'block';
   const el=document.getElementById('ajustes-auth-area');
   if(!el) return;
   if(currentUser){
