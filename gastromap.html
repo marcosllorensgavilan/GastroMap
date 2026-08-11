@@ -600,15 +600,14 @@ a{text-decoration:none;color:inherit}
     background:var(--white);border-radius:16px 16px 0 0;
     box-shadow:0 -6px 24px rgba(0,0,0,0.18);
     display:flex;flex-direction:column;
-    max-height:82vh;
-    transform:translateY(calc(100% - 172px));
-    transition:transform 0.28s cubic-bezier(0.22,0.8,0.25,1);
+    height:150px;overflow:hidden;
+    transition:height 0.28s cubic-bezier(0.22,0.8,0.25,1);
   }
-  .map-sidebar.expanded{transform:translateY(0)}
+  .map-sidebar.expanded{height:78vh}
   .map-sidebar-handle{display:flex;justify-content:center;padding:14px 0 10px;cursor:pointer;flex-shrink:0}
   .map-sidebar-handle::after{content:'';width:38px;height:4px;border-radius:4px;background:var(--g3)}
-  .map-sidebar-header{flex-shrink:0}
-  .map-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .map-sidebar-header{flex-shrink:0;overflow:hidden}
+  .map-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
   .bot-layout{grid-template-columns:1fr}
   .bot-sidebar{display:none}
   .hero h1{font-size:28px}
