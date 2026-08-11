@@ -187,9 +187,6 @@ a{text-decoration:none;color:inherit}
   border-radius:var(--rsm);padding:9px 12px;font-size:13px;color:var(--text);outline:none;
 }
 .map-input:focus{border-color:var(--orange)}
-.map-toggle-row{display:none;gap:8px;padding:8px 12px;border-bottom:0.5px solid var(--g2);background:var(--white)}
-.map-toggle-btn{flex:1;padding:9px;border-radius:8px;border:1px solid var(--g2);background:var(--g1);font-size:13px;font-weight:600;color:var(--textm)}
-.map-toggle-btn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
 .search-suggest-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--white);border:1px solid var(--g2);border-radius:var(--rsm);margin-top:6px;box-shadow:var(--shadow2);z-index:2000;overflow:hidden;display:none;max-height:280px;overflow-y:auto}
 .search-suggest-dropdown.show{display:block}
 .search-suggest-label{font-size:10px;font-weight:700;color:var(--textl);text-transform:uppercase;letter-spacing:0.4px;padding:8px 14px 4px}
@@ -595,13 +592,23 @@ a{text-decoration:none;color:inherit}
   }
   .nav-links.mobile-open{display:flex}
   .nav-links .nav-link{justify-content:flex-start;padding:14px 16px;font-size:15px;border-radius:10px}
-  .map-toggle-row{display:flex}
-  .map-layout{grid-template-columns:1fr;grid-template-rows:1fr}
-  .map-sidebar{display:block}
-  .map-sidebar.mobile-hidden{display:none}
-  .map-wrap{display:none}
-  .map-wrap.mobile-active{display:block;height:calc(100vh - 56px - 46px)}
+  .map-layout{grid-template-columns:1fr;grid-template-rows:1fr;position:relative;height:calc(100vh - 56px);overflow:hidden}
+  .map-wrap{position:absolute;inset:0;display:block}
   #leaflet-map{height:100%}
+  .map-sidebar{
+    position:absolute;left:0;right:0;bottom:0;z-index:600;
+    background:var(--white);border-radius:16px 16px 0 0;
+    box-shadow:0 -6px 24px rgba(0,0,0,0.18);
+    display:flex;flex-direction:column;
+    max-height:82vh;
+    transform:translateY(calc(100% - 172px));
+    transition:transform 0.28s cubic-bezier(0.22,0.8,0.25,1);
+  }
+  .map-sidebar.expanded{transform:translateY(0)}
+  .map-sidebar-handle{display:flex;justify-content:center;padding:14px 0 10px;cursor:pointer;flex-shrink:0}
+  .map-sidebar-handle::after{content:'';width:38px;height:4px;border-radius:4px;background:var(--g3)}
+  .map-sidebar-header{flex-shrink:0}
+  .map-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
   .bot-layout{grid-template-columns:1fr}
   .bot-sidebar{display:none}
   .hero h1{font-size:28px}
@@ -692,12 +699,9 @@ a{text-decoration:none;color:inherit}
 
 <!-- ═══════════════════════════════ MAPA ═══════════════════════════════ -->
 <div id="page-mapa" class="page">
-  <div class="map-toggle-row">
-    <button class="map-toggle-btn active" id="map-toggle-lista" onclick="switchMapMobileView('lista')">☰ Lista</button>
-    <button class="map-toggle-btn" id="map-toggle-mapa" onclick="switchMapMobileView('mapa')">🗺 Mapa</button>
-  </div>
   <div class="map-layout">
     <div class="map-sidebar" id="map-sidebar">
+      <div class="map-sidebar-handle" id="map-sidebar-handle" onclick="toggleMapSheet()"></div>
       <div class="map-sidebar-header">
         <div class="map-search-row">
           <input class="map-input" id="map-city-input" placeholder="Ciudad, o un plato: tapas, sushi, paella…" onkeydown="if(event.key==='Enter')mapSearch()">
@@ -1148,23 +1152,11 @@ function showPage(id) {
 function toggleMobileNav(){
   document.getElementById('nav-links').classList.toggle('mobile-open');
 }
-function switchMapMobileView(view){
+function toggleMapSheet(forceState){
   const sidebar=document.getElementById('map-sidebar');
-  const wrap=document.getElementById('map-wrap');
-  const btnLista=document.getElementById('map-toggle-lista');
-  const btnMapa=document.getElementById('map-toggle-mapa');
-  if(view==='mapa'){
-    sidebar.classList.add('mobile-hidden');
-    wrap.classList.add('mobile-active');
-    btnLista.classList.remove('active'); btnMapa.classList.add('active');
-    // Leaflet dibuja mal si el mapa estaba oculto (display:none) al iniciar
-    // o cambiar de tamaño — hay que decirle explícitamente que recalcule.
-    if(leafletMap) setTimeout(()=>leafletMap.invalidateSize(),50);
-  }else{
-    sidebar.classList.remove('mobile-hidden');
-    wrap.classList.remove('mobile-active');
-    btnMapa.classList.remove('active'); btnLista.classList.add('active');
-  }
+  if(!sidebar) return;
+  const expand = forceState!==undefined ? forceState : !sidebar.classList.contains('expanded');
+  sidebar.classList.toggle('expanded',expand);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1563,6 +1555,7 @@ function initMap(){
   leafletMap = L.map('leaflet-map',{worldCopyJump:true,crs:L.CRS.EPSG3857}).setView([25,10],2.3);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(leafletMap);
   leafletMap.on('moveend zoomend',onMapMoved);
+  if(isTouchDevice) leafletMap.on('dragstart click',()=>toggleMapSheet(false));
   setTimeout(()=>leafletMap.invalidateSize(),50);
   loadMapArea();
 }
@@ -1799,6 +1792,7 @@ function renderMapResults(places){
         if(highlightedMarkerId===p.id){ openRestaurantFromOSM(p); return; }
         highlightMapMarker(p.id);
         if(leafletMap) leafletMap.panTo([p.lat,p.lon]);
+        toggleMapSheet(false);
       };
     }else{
       item.onmouseenter=()=>highlightMapMarker(p.id);
