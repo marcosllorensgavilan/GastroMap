@@ -1484,6 +1484,19 @@ function resetCategoryFilters(){
     <button class="filter-btn" onclick="explorarFiltrar(this,'fast_food')">🍔 Fast Food</button>
     <button class="filter-btn" onclick="explorarFiltrar(this,'bakery')">🥐 Panaderías</button>`;
 }
+// Busca restaurantes por NOMBRE (coincidencia parcial) en tu base de datos
+// local. Si no está arrancado el servidor local, devuelve vacío en vez de
+// fallar — en ese caso el buscador seguirá probando como ciudad.
+async function searchRestaurantsByName(query){
+  try{
+    const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),4000);
+    const resp=await fetch(`${LOCAL_DB_URL}/api/restaurants/search?q=${encodeURIComponent(query)}&limit=30`,{signal:ctrl.signal});
+    clearTimeout(t);
+    if(!resp.ok) return [];
+    const data=await resp.json();
+    return data.places||[];
+  }catch(e){ return []; }
+}
 async function heroSearch(){
   const city = document.getElementById('hero-search').value.trim();
   if(!city) return;
@@ -1492,10 +1505,20 @@ async function heroSearch(){
   explorarCity = city;
   const res = document.getElementById('explorar-results');
   const title = document.getElementById('explorar-section-title');
-  res.innerHTML = '<div class="inline-loading"><div class="spinner"></div> Buscando en OpenStreetMap…</div>';
+  res.innerHTML = '<div class="inline-loading"><div class="spinner"></div> Buscando…</div>';
   resetCategoryFilters();
   document.getElementById('explorar-filters').style.display='flex';
   try{
+    // Primero probamos si coincide con nombres de restaurantes de verdad
+    // (búsqueda parcial: "el gaucho" encuentra "Bar Restaurante El Gaucho").
+    const nameMatches = await searchRestaurantsByName(city);
+    if(nameMatches.length){
+      explorarPlaces = nameMatches;
+      title.innerHTML = `Resultados para <em>"${city}"</em>`;
+      document.getElementById('explorar-count').textContent = nameMatches.length+' restaurantes';
+      renderExplorar(nameMatches);
+      return;
+    }
     const {places} = await fetchOSMCity(city);
     explorarPlaces = places;
     title.innerHTML = `Top <em>${cap(city)}</em>`;
@@ -1656,6 +1679,16 @@ async function mapSearch(){
   document.getElementById('map-loading').classList.add('show');
   document.getElementById('map-stats').innerHTML='Buscando…';
   try{
+    // Primero probamos si es el nombre (o parte del nombre) de un restaurante real.
+    const nameMatches = await searchRestaurantsByName(query);
+    if(nameMatches.length){
+      pendingHighlightId = nameMatches[0].id;
+      suppressMoveUntil=Date.now()+1200;
+      leafletMap.setView([nameMatches[0].lat,nameMatches[0].lon],16,{animate:true});
+      renderMapResults(nameMatches);
+      if(markersById[pendingHighlightId]){ highlightMapMarker(pendingHighlightId); pendingHighlightId=null; }
+      return;
+    }
     const cuisineMatches=matchFoodKeyword(query);
     if(cuisineMatches){
       document.getElementById('map-stats').innerHTML='Buscando "'+query+'" cerca de ti…';

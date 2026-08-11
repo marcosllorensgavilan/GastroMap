@@ -324,6 +324,42 @@ app.get('/api/restaurants', (req, res) => {
   res.json({ places, count: places.length, source: 'gastromap-local-db' });
 });
 
+// Búsqueda por NOMBRE de restaurante (coincidencia parcial, no hace falta
+// escribirlo entero ni exacto — "el gaucho" encuentra "Bar Restaurante El
+// Gaucho"). Es la pieza que faltaba: los buscadores de arriba solo sabían
+// interpretar el texto como ciudad o como plato, nunca como nombre propio.
+app.get('/api/restaurants/search', (req, res) => {
+  const q = (req.query.q || '').trim();
+  const limit = Math.min(parseInt(req.query.limit || '30', 10), 50);
+  if (!q || q.length < 2) {
+    return res.status(400).json({ error: 'Escribe al menos 2 letras para buscar.' });
+  }
+  const rows = db.prepare(`
+    SELECT * FROM restaurants
+    WHERE name LIKE '%' || ? || '%' COLLATE NOCASE
+    ORDER BY (name LIKE ? || '%' COLLATE NOCASE) DESC, name COLLATE NOCASE ASC
+    LIMIT ?
+  `).all(q, q, limit);
+
+  const places = rows.map(r => ({
+    id: r.ogc_fid,
+    lat: r.lat,
+    lon: r.lon,
+    name: r.name,
+    tags: {
+      amenity: r.amenity,
+      cuisine: r.cuisine || undefined,
+      'addr:street': r.addr_street || undefined,
+      'addr:housenumber': r.addr_housenumber || undefined,
+      phone: r.phone || undefined,
+      website: r.website || undefined,
+    },
+    score: fakeScore(r.name),
+    reviews: fakeReviews(r.name),
+  }));
+  res.json({ places, count: places.length });
+});
+
 app.get('/api/health', (req, res) => {
   const total = db.prepare('SELECT COUNT(*) as c FROM restaurants').get().c;
   res.json({ ok: true, totalRestaurants: total, aiConfigured: !!ANTHROPIC_API_KEY, dailyAiLimit: DAILY_AI_LIMIT });
