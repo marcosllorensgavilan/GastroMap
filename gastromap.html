@@ -593,7 +593,7 @@ a{text-decoration:none;color:inherit}
   .nav-links.mobile-open{display:flex}
   .nav-links .nav-link{justify-content:flex-start;padding:14px 16px;font-size:15px;border-radius:10px}
   .map-layout{grid-template-columns:1fr;grid-template-rows:1fr;position:relative;height:calc(100vh - 56px);overflow:hidden}
-  .map-wrap{position:absolute;inset:0;display:block}
+  .map-wrap{position:absolute;inset:0;display:block;z-index:1}
   #leaflet-map{height:100%}
   .map-sidebar{
     position:absolute;left:0;right:0;bottom:0;z-index:600;
@@ -604,7 +604,7 @@ a{text-decoration:none;color:inherit}
     transition:height 0.28s cubic-bezier(0.22,0.8,0.25,1);
   }
   .map-sidebar.expanded{height:78vh}
-  .map-sidebar-handle{display:flex;justify-content:center;padding:14px 0 10px;cursor:pointer;flex-shrink:0}
+  .map-sidebar-handle{display:flex;justify-content:center;padding:14px 0 10px;cursor:pointer;flex-shrink:0;touch-action:manipulation}
   .map-sidebar-handle::after{content:'';width:38px;height:4px;border-radius:4px;background:var(--g3)}
   .map-sidebar-header{flex-shrink:0;overflow:hidden}
   .map-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
