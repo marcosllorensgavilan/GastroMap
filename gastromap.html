@@ -1598,7 +1598,9 @@ async function loadMapArea(){
     renderMapResults(places);
   }catch(e){
     if(seq!==mapLoadSeq) return;
-    statsEl.textContent='Error: '+e.message;
+    // No borramos nada de lo que ya había cargado — solo avisamos de que esta
+    // zona en concreto no se pudo actualizar, sin perder lo que ya se ve.
+    statsEl.innerHTML = `<strong>${Object.keys(allLoadedPlaces).length}</strong> lugares descubiertos · <span style="color:var(--textl)">No se pudo actualizar esta zona, sigue explorando</span>`;
   }finally{
     if(seq===mapLoadSeq) document.getElementById('map-loading').classList.remove('show');
   }
@@ -1700,27 +1702,6 @@ function updateCuisineDropdown(places){
   sel.innerHTML='<option value="Todas">Todas las cocinas</option>'+cuisines.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`).join('');
   sel.value='Todas';
 }
-// Convierte los resultados de Overpass a un FeatureCollection GeoJSON estándar
-// (coordenadas [lon,lat] en WGS84 — Leaflet las reproyecta a Web Mercator EPSG:3857 al pintarlas)
-function placesToGeoJSON(places){
-  return {
-    type:'FeatureCollection',
-    features: places.map((p,i)=>({
-      type:'Feature',
-      properties:{
-        id:p.id,
-        name:p.name,
-        cuisine: fmtCuisine(p.tags)||cap(p.tags.amenity),
-        amenity: p.tags.amenity||'',
-        address: p.tags['addr:street']?`${p.tags['addr:street']} ${p.tags['addr:housenumber']||''}`.trim():'',
-        phone: p.tags.phone||'',
-        score: p.score,
-        rank: i
-      },
-      geometry:{type:'Point',coordinates:[p.lon,p.lat]}
-    }))
-  };
-}
 // Pin de marcador con la forma del logo de GastroMap: gota de mapa con
 // un tenedor dentro de un círculo. Dorado para el top 3, oscuro para el resto.
 function gastroPinSVG(isTop){
@@ -1743,45 +1724,41 @@ function gastroPinSVG(isTop){
   </svg>`;
 }
 
+let allLoadedPlaces={}; // acumula TODO lo descubierto en el mapa, para no perderlo al moverse
 function renderMapResults(places){
-  clearMapMarkers();
   const list = document.getElementById('map-list');
-  const cityFallback = document.getElementById('map-city-input').value.trim() || 'esta zona';
-  document.getElementById('map-stats').innerHTML=`<strong>${places.length}</strong> lugares · <span class="osm-badge"><span class="osm-dot"></span>OpenStreetMap</span>`;
-  if(!places.length){list.innerHTML='<div class="map-empty"><div class="map-empty-icon">🔍</div><div class="map-empty-title">Sin resultados</div></div>';return;}
+  const totalPct = Object.keys(allLoadedPlaces).length;
+  if(!places.length){
+    document.getElementById('map-stats').innerHTML=`<strong>${totalPct}</strong> lugares descubiertos · <span class="osm-badge"><span class="osm-dot"></span>OpenStreetMap</span>`;
+    if(!totalPct) list.innerHTML='<div class="map-empty"><div class="map-empty-icon">🔍</div><div class="map-empty-title">Sin resultados por aquí</div></div>';
+    return; // si ya había resultados de antes, los dejamos tal cual — no se pierden al moverte a una zona vacía
+  }
   list.innerHTML='';
 
   const shown = places.slice(0,500);
-  const placesById = {};
-  shown.forEach(p=>{ placesById[p.id]=p; });
-  const geojson = placesToGeoJSON(shown);
+  if(!geoLayerGroup){ geoLayerGroup=L.layerGroup().addTo(leafletMap); }
 
-  geoLayerGroup = L.geoJSON(geojson,{
-    pointToLayer:(feature,latlng)=>{
-      const isTop = feature.properties.rank < 3;
-      const icon=L.divIcon({
-        html: gastroPinSVG(isTop),
-        className:'', iconSize:[30,38], iconAnchor:[15,38], popupAnchor:[0,-34], tooltipAnchor:[0,-30]
-      });
-      return L.marker(latlng,{icon});
-    },
-    onEachFeature:(feature,layer)=>{
-      const props=feature.properties;
-      layer.bindTooltip(`${props.name} · ★ ${props.score}`,{direction:'top',offset:[0,-10],className:'restaurant-tooltip'});
-      markersById[props.id]=layer;
-      layer.on('click',()=>{
-        if(layer.isTooltipOpen()){
-          openRestaurantFromOSM(placesById[props.id]);
-        }else{
-          if(openTooltipLayer && openTooltipLayer!==layer) openTooltipLayer.closeTooltip();
-          layer.openTooltip();
-          openTooltipLayer=layer;
-        }
-      });
-    }
-  }).addTo(leafletMap);
+  shown.forEach((p,i)=>{
+    allLoadedPlaces[p.id]=p;
+    if(markersById[p.id]) return; // ya estaba pintado de una pasada anterior, no lo duplicamos
+    const isTop=i<3;
+    const icon=L.divIcon({html:gastroPinSVG(isTop),className:'',iconSize:[30,38],iconAnchor:[15,38],popupAnchor:[0,-34],tooltipAnchor:[0,-30]});
+    const marker=L.marker([p.lat,p.lon],{icon}).addTo(geoLayerGroup);
+    marker.bindTooltip(`${p.name} · ★ ${p.score}`,{direction:'top',offset:[0,-10],className:'restaurant-tooltip'});
+    markersById[p.id]=marker;
+    marker.on('click',()=>{
+      if(marker.isTooltipOpen()){
+        openRestaurantFromOSM(p);
+      }else{
+        if(openTooltipLayer && openTooltipLayer!==marker) openTooltipLayer.closeTooltip();
+        marker.openTooltip();
+        openTooltipLayer=marker;
+      }
+    });
+  });
   leafletMap.off('click',closeOpenTooltip);
   leafletMap.on('click',closeOpenTooltip);
+  document.getElementById('map-stats').innerHTML=`<strong>${Object.keys(allLoadedPlaces).length}</strong> lugares descubiertos · <span class="osm-badge"><span class="osm-dot"></span>OpenStreetMap</span>`;
 
   shown.forEach(p=>{
     const cuisine=fmtCuisine(p.tags)||cap(p.tags.amenity);
@@ -1804,6 +1781,7 @@ function clearMapMarkers(){
   if(geoLayerGroup && leafletMap) leafletMap.removeLayer(geoLayerGroup);
   geoLayerGroup=null;
   markersById={};
+  allLoadedPlaces={};
 }
 
 
