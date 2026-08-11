@@ -1596,6 +1596,10 @@ async function loadMapArea(){
     document.getElementById('map-filters').style.display='flex';
     document.querySelectorAll('#map-filters .filter-btn').forEach((btn,i)=>btn.classList.toggle('active',i===0));
     renderMapResults(places);
+    if(pendingHighlightId && markersById[pendingHighlightId]){
+      highlightMapMarker(pendingHighlightId);
+      pendingHighlightId=null;
+    }
   }catch(e){
     if(seq!==mapLoadSeq) return;
     // No borramos nada de lo que ya había cargado — solo avisamos de que esta
@@ -1704,7 +1708,21 @@ function updateCuisineDropdown(places){
 }
 // Pin de marcador con la forma del logo de GastroMap: gota de mapa con
 // un tenedor dentro de un círculo. Dorado para el top 3, oscuro para el resto.
-function gastroPinSVG(isTop){
+function gastroPinSVG(isTop,isHighlighted){
+  if(isHighlighted){
+    return `<svg width="30" height="38" viewBox="0 0 30 38" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.4))">
+      <defs><linearGradient id="pgh" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#EF6F62"/><stop offset="100%" stop-color="#C1372B"/></linearGradient></defs>
+      <path d="M15 0C6.7 0 0 6.7 0 15c0 10.9 15 23 15 23s15-12.1 15-23C30 6.7 23.3 0 15 0z" fill="url(#pgh)" stroke="white" stroke-width="2"/>
+      <circle cx="15" cy="14.5" r="6.5" fill="none" stroke="white" stroke-width="1.8"/>
+      <g transform="translate(15,8.2)" fill="white">
+        <rect x="-3.6" y="0" width="1.3" height="5.5" rx="0.6"/>
+        <rect x="-0.65" y="0" width="1.3" height="5.5" rx="0.6"/>
+        <rect x="2.3" y="0" width="1.3" height="5.5" rx="0.6"/>
+        <path d="M -3.9 5.2 Q -3.9 7.4 -0.65 7.4 L 0.35 7.4 Q 3.6 7.4 3.6 5.2 L 3.6 4.6 L -3.9 4.6 Z"/>
+        <rect x="-0.65" y="6.8" width="1.3" height="6" rx="0.6"/>
+      </g>
+    </svg>`;
+  }
   const gradId = isTop ? 'pg1' : 'pg0';
   const grad = isTop
     ? `<linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F3CE7E"/><stop offset="100%" stop-color="#D08A2E"/></linearGradient>`
@@ -1722,6 +1740,14 @@ function gastroPinSVG(isTop){
       <rect x="-0.65" y="6.8" width="1.3" height="6" rx="0.6"/>
     </g>
   </svg>`;
+}
+// Icono del pin — normal (30x38) o resaltado (42x53, más grande para que se
+// note claramente cuál es al pasar el ratón por la lista, o al tocarlo en móvil)
+function markerIcon(isTop,isHighlighted){
+  if(isHighlighted){
+    return L.divIcon({html:gastroPinSVG(false,true),className:'',iconSize:[42,53],iconAnchor:[21,53],popupAnchor:[0,-48],tooltipAnchor:[0,-44]});
+  }
+  return L.divIcon({html:gastroPinSVG(isTop,false),className:'',iconSize:[30,38],iconAnchor:[15,38],popupAnchor:[0,-34],tooltipAnchor:[0,-30]});
 }
 
 let allLoadedPlaces={}; // acumula TODO lo descubierto en el mapa, para no perderlo al moverse
@@ -1742,8 +1768,9 @@ function renderMapResults(places){
     allLoadedPlaces[p.id]=p;
     if(markersById[p.id]) return; // ya estaba pintado de una pasada anterior, no lo duplicamos
     const isTop=i<3;
-    const icon=L.divIcon({html:gastroPinSVG(isTop),className:'',iconSize:[30,38],iconAnchor:[15,38],popupAnchor:[0,-34],tooltipAnchor:[0,-30]});
+    const icon=markerIcon(isTop,false);
     const marker=L.marker([p.lat,p.lon],{icon}).addTo(geoLayerGroup);
+    marker._isTop=isTop;
     marker.bindTooltip(`${p.name} · ★ ${p.score}`,{direction:'top',offset:[0,-10],className:'restaurant-tooltip'});
     markersById[p.id]=marker;
     marker.on('click',()=>{
@@ -1765,10 +1792,48 @@ function renderMapResults(places){
     const item=document.createElement('div');
     item.className='map-item'; item.id='mitem-'+p.id;
     item.innerHTML=`<div class="map-emoji"><img ${foodImgAttrs(p.tags,p.id,80,80)} alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"></div><div style="flex:1;min-width:0"><div class="map-item-name">${p.name}</div><div class="map-item-sub">${cuisine}</div></div><div class="map-item-dist">★ ${p.score}</div>`;
-    item.onclick=()=>openRestaurantFromOSM(p);
+    if(isTouchDevice){
+      // En móvil no hay "hover" — el primer toque solo resalta el pin en el
+      // mapa, y hay que tocar una segunda vez para entrar a la ficha.
+      item.onclick=()=>{
+        if(highlightedMarkerId===p.id){ openRestaurantFromOSM(p); return; }
+        highlightMapMarker(p.id);
+        if(leafletMap) leafletMap.panTo([p.lat,p.lon]);
+      };
+    }else{
+      item.onmouseenter=()=>highlightMapMarker(p.id);
+      item.onmouseleave=()=>clearMapHighlight();
+      item.onclick=()=>openRestaurantFromOSM(p);
+    }
     list.appendChild(item);
   });
 }
+// ═══════════════════════════════════════════════════════════
+// RESALTAR UN PIN — al pasar el ratón por la lista (o primer toque en
+// móvil), o al venir de "Ver en el mapa" desde la ficha de un restaurante
+// ═══════════════════════════════════════════════════════════
+let highlightedMarkerId=null;
+let pendingHighlightId=null; // para cuando el pin aún no está cargado en el mapa
+function highlightMapMarker(id){
+  if(highlightedMarkerId===id) return;
+  if(highlightedMarkerId && markersById[highlightedMarkerId]){
+    const prev=markersById[highlightedMarkerId];
+    prev.setIcon(markerIcon(prev._isTop,false));
+  }
+  const marker=markersById[id];
+  if(!marker){ highlightedMarkerId=null; return; }
+  marker.setIcon(markerIcon(marker._isTop,true));
+  highlightedMarkerId=id;
+}
+function clearMapHighlight(){
+  if(highlightedMarkerId && markersById[highlightedMarkerId]){
+    const prev=markersById[highlightedMarkerId];
+    prev.setIcon(markerIcon(prev._isTop,false));
+  }
+  highlightedMarkerId=null;
+}
+const isTouchDevice = window.matchMedia('(hover: none)').matches;
+
 function selectMapItem(p,item){
   if(activeMapItem) activeMapItem.classList.remove('active');
   item.classList.add('active'); activeMapItem=item;
@@ -2125,6 +2190,7 @@ async function geocodeOnly(query){
 async function showOnGastroMap(d){
   if(!d) return;
   showPageDirect('mapa');
+  pendingHighlightId = d.id; // en cuanto ese pin aparezca en el mapa, se resaltará solo
   const goTo=(lat,lon)=>{
     if(!leafletMap) return;
     suppressMoveUntil=Date.now()+1200;
