@@ -1784,7 +1784,6 @@ function renderMapResults(places){
     if(!totalPct) list.innerHTML='<div class="map-empty"><div class="map-empty-icon">🔍</div><div class="map-empty-title">Sin resultados por aquí</div></div>';
     return; // si ya había resultados de antes, los dejamos tal cual — no se pierden al moverte a una zona vacía
   }
-  list.innerHTML='';
 
   const shown = places.slice(0,500);
   if(!geoLayerGroup){ geoLayerGroup=L.layerGroup().addTo(leafletMap); }
@@ -1812,7 +1811,11 @@ function renderMapResults(places){
   leafletMap.on('click',closeOpenTooltip);
   document.getElementById('map-stats').innerHTML=`<strong>${Object.keys(allLoadedPlaces).length}</strong> lugares descubiertos · <span class="osm-badge"><span class="osm-dot"></span>OpenStreetMap</span>`;
 
-  shown.forEach(p=>{
+  // La lista tiene que reflejar TODO lo acumulado, igual que los pines —
+  // no solo la última zona por la que hemos pasado.
+  list.innerHTML='';
+  const allShown = Object.values(allLoadedPlaces).sort((a,b)=>b.score-a.score);
+  allShown.forEach(p=>{
     const cuisine=fmtCuisine(p.tags)||cap(p.tags.amenity);
     const item=document.createElement('div');
     item.className='map-item'; item.id='mitem-'+p.id;
