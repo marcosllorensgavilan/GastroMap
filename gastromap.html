@@ -802,7 +802,7 @@ a{text-decoration:none;color:inherit}
         </div>
       </div>
       <div class="ia-field">
-        <div class="ia-label">♥ Ocasión</div>
+        <div class="ia-label"><svg width="15" height="15" viewBox="0 0 24 24" style="vertical-align:-3px"><defs><linearGradient id="ghstatic" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F3CE7E"/><stop offset="100%" stop-color="#D08A2E"/></linearGradient></defs><path d="M12,21.35l-1.45-1.32C5.4,15.36,2,12.28,2,8.5 2,5.42,4.42,3,7.5,3c1.74,0,3.41,0.81,4.5,2.09C13.09,3.81,14.76,3,16.5,3 19.58,3,22,5.42,22,8.5c0,3.78-3.4,6.86-8.55,11.54L12,21.35z" fill="url(#ghstatic)"/></svg> Ocasión</div>
         <div class="chips-select" id="ia-ocasion">
           <button class="chip-opt" onclick="toggleChip(this)">Cena romántica</button>
           <button class="chip-opt" onclick="toggleChip(this)">Comida de negocios</button>
@@ -1067,7 +1067,7 @@ a{text-decoration:none;color:inherit}
         </div>
         <div class="how-to">Cómo ganar puntos:</div>
         <div class="earn-item">📝 Publicar reseña: <strong style="margin-left:4px">+10 pts</strong></div>
-        <div class="earn-item">♥ Guardar favorito: <strong style="margin-left:4px">+2 pts</strong></div>
+        <div class="earn-item"><svg width="15" height="15" viewBox="0 0 24 24" style="vertical-align:-3px"><defs><linearGradient id="ghstatic" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F3CE7E"/><stop offset="100%" stop-color="#D08A2E"/></linearGradient></defs><path d="M12,21.35l-1.45-1.32C5.4,15.36,2,12.28,2,8.5 2,5.42,4.42,3,7.5,3c1.74,0,3.41,0.81,4.5,2.09C13.09,3.81,14.76,3,16.5,3 19.58,3,22,5.42,22,8.5c0,3.78-3.4,6.86-8.55,11.54L12,21.35z" fill="url(#ghstatic)"/></svg> Guardar favorito: <strong style="margin-left:4px">+2 pts</strong></div>
       </div>
     </div>
     <div id="profile-tab-misresenas" style="display:none">
@@ -1178,6 +1178,27 @@ function getEmoji(tags){
   if(c.includes('steak')||c.includes('grill')||c.includes('bbq')) return '🥩';
   return EMOJIS[tags.amenity]||EMOJIS.default;
 }
+// Iconos de estrella/corazón propios (degradado dorado), en vez de los
+// caracteres ★☆♥♡ que se ven distinto en cada móvil.
+const STAR_PATH='M12 2.5l2.9 6.2 6.6.7-4.9 4.6 1.3 6.6L12 17.4l-5.9 3.2 1.3-6.6-4.9-4.6 6.6-.7z';
+const HEART_PATH='M12,21.35l-1.45-1.32C5.4,15.36,2,12.28,2,8.5 2,5.42,4.42,3,7.5,3c1.74,0,3.41,0.81,4.5,2.09C13.09,3.81,14.76,3,16.5,3 19.58,3,22,5.42,22,8.5c0,3.78-3.4,6.86-8.55,11.54L12,21.35z';
+function starSVG(filled,size){
+  const s=size||14;
+  if(filled) return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" style="vertical-align:-2px"><defs><linearGradient id="gs${s}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F3CE7E"/><stop offset="100%" stop-color="#D08A2E"/></linearGradient></defs><path d="${STAR_PATH}" fill="url(#gs${s})"/></svg>`;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" style="vertical-align:-2px"><path d="${STAR_PATH}" fill="none" stroke="#C8C3B8" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+}
+function heartSVG(filled,size){
+  const s=size||16;
+  if(filled) return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" style="vertical-align:-3px"><defs><linearGradient id="gh${s}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F3CE7E"/><stop offset="100%" stop-color="#D08A2E"/></linearGradient></defs><path d="${HEART_PATH}" fill="url(#gh${s})"/></svg>`;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" style="vertical-align:-3px"><path d="${HEART_PATH}" fill="none" stroke="#C8C3B8" stroke-width="1.3" stroke-linejoin="round"/></svg>`;
+}
+// Genera la fila de 5 estrellas (llenas hasta "rating", vacías el resto).
+function starRatingHTML(rating,max,size){
+  max=max||5;
+  let html='';
+  for(let i=0;i<max;i++) html+=starSVG(i<rating,size);
+  return html;
+}
 function fmtCuisine(tags){
   if(!tags) return '';
   const c=tags.cuisine;
@@ -1222,7 +1243,7 @@ function renderGlobalTop(sortMode){
   filters.style.display='flex';
   filters.innerHTML=`
     <button class="filter-btn ${sortMode==='score'?'active':''}" onclick="sortGlobalTop('score')">✦ Global Score</button>
-    <button class="filter-btn ${sortMode==='rating'?'active':''}" onclick="sortGlobalTop('rating')">★ Valoración</button>
+    <button class="filter-btn ${sortMode==='rating'?'active':''}" onclick="sortGlobalTop('rating')">${starSVG(true)} Valoración</button>
     <button class="filter-btn ${sortMode==='cheap'?'active':''}" onclick="sortGlobalTop('cheap')">$ Más barato</button>
     <button class="filter-btn ${sortMode==='expensive'?'active':''}" onclick="sortGlobalTop('expensive')">$ Más caro</button>`;
   let list=[...GLOBAL_TOP];
@@ -1240,7 +1261,7 @@ function renderGlobalTop(sortMode){
         <img src="${r.photo}" alt="${r.name}" loading="lazy" style="width:100%;height:100%;object-fit:cover">
         ${badge}
         <div class="card-score">${r.score}</div>
-        <button class="card-save" onclick="toggleFav(event,${JSON.stringify({id:globalId(r.name),imgSeed:'global-'+r.name,tags:{cuisine:r.cuisine},photo:r.photo,name:r.name,address:r.address,cuisine:r.cuisine,rating:r.rating,reviewCount:r.reviews,score:r.score,phone:null,website:null,badges:r.badges.map(b=>BADGE_META[b].label)}).replace(/"/g,'&quot;')})">♡</button>
+        <button class="card-save" onclick="toggleFav(event,${JSON.stringify({id:globalId(r.name),imgSeed:'global-'+r.name,tags:{cuisine:r.cuisine},photo:r.photo,name:r.name,address:r.address,cuisine:r.cuisine,rating:r.rating,reviewCount:r.reviews,score:r.score,phone:null,website:null,badges:r.badges.map(b=>BADGE_META[b].label)}).replace(/"/g,'&quot;')})">${heartSVG(false)}</button>
         <div class="card-badge-row">${risingBadge}</div>
       </div>
       <div class="card-body">
@@ -1248,7 +1269,7 @@ function renderGlobalTop(sortMode){
         <div class="card-addr" style="margin-top:0;margin-bottom:8px">📍 ${r.address}</div>
         <div class="card-cuisine">${r.cuisine}</div>
         <div class="card-meta">
-          <span class="card-rating">★ ${r.rating} (${r.reviews})</span>
+          <span class="card-rating">${starSVG(true)} ${r.rating} (${r.reviews})</span>
         </div>
         <div style="color:var(--purple);font-size:12px;font-weight:600;margin-top:6px">~${r.price}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${r.badges.map(b=>`<span class="tag ${BADGE_META[b].cls}">${BADGE_META[b].label}</span>`).join('')}</div>
@@ -1560,15 +1581,15 @@ function renderExplorar(places){
       <div class="card-img">
         <img ${foodImgAttrs(p.tags,p.id,400,300)} alt="${p.name}" style="width:100%;height:100%;object-fit:cover">
         ${badge}
-        <div class="card-score">★ ${p.score}</div>
-        <button class="card-save ${isSaved?'saved':''}" onclick="toggleFav(event,${JSON.stringify({id:p.id,imgSeed:p.id,tags:p.tags,name:p.name,address:explorarCity,lat:p.lat,lon:p.lon,cuisine,rating:(p.score/2).toFixed(1),reviewCount:p.reviews,score:Math.round(p.score*10),phone:p.tags.phone,website:p.tags.website,badges:[]}).replace(/"/g,'&quot;')})">${isSaved?'♥':'♡'}</button>
+        <div class="card-score">${starSVG(true)} ${p.score}</div>
+        <button class="card-save ${isSaved?'saved':''}" onclick="toggleFav(event,${JSON.stringify({id:p.id,imgSeed:p.id,tags:p.tags,name:p.name,address:explorarCity,lat:p.lat,lon:p.lon,cuisine,rating:(p.score/2).toFixed(1),reviewCount:p.reviews,score:Math.round(p.score*10),phone:p.tags.phone,website:p.tags.website,badges:[]}).replace(/"/g,'&quot;')})">${heartSVG(isSaved)}</button>
         <div class="card-badge-row">${trendBadge}</div>
       </div>
       <div class="card-body">
         <div class="card-name">${p.name}</div>
         <div class="card-cuisine">${cuisine}</div>
         <div class="card-meta">
-          <span class="card-rating">★ ${p.score}</span>
+          <span class="card-rating">${starSVG(true)} ${p.score}</span>
           <span class="card-price">${p.tags['addr:street']?'·':''}</span>
           <span class="tag">${cap(p.tags.amenity||'')}</span>
         </div>
@@ -1934,7 +1955,7 @@ function renderMapResults(places){
     const icon=markerIcon(isTop,false);
     const marker=L.marker([p.lat,p.lon],{icon}).addTo(geoLayerGroup);
     marker._isTop=isTop;
-    marker.bindTooltip(`${p.name} · ★ ${p.score}`,{direction:'top',offset:[0,-10],className:'restaurant-tooltip'});
+    marker.bindTooltip(`${p.name} · ${starSVG(true,12)} ${p.score}`,{direction:'top',offset:[0,-10],className:'restaurant-tooltip'});
     markersById[p.id]=marker;
     marker.on('click',()=>{
       if(marker.isTooltipOpen()){
@@ -1955,7 +1976,7 @@ function renderMapResults(places){
     const cuisine=fmtCuisine(p.tags)||cap(p.tags.amenity);
     const item=document.createElement('div');
     item.className='map-item'; item.id='mitem-'+p.id;
-    item.innerHTML=`<div class="map-emoji"><img ${foodImgAttrs(p.tags,p.id,80,80)} alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"></div><div style="flex:1;min-width:0"><div class="map-item-name">${p.name}</div><div class="map-item-sub">${cuisine}</div></div><div class="map-item-dist">★ ${p.score}</div>`;
+    item.innerHTML=`<div class="map-emoji"><img ${foodImgAttrs(p.tags,p.id,80,80)} alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"></div><div style="flex:1;min-width:0"><div class="map-item-name">${p.name}</div><div class="map-item-sub">${cuisine}</div></div><div class="map-item-dist">${starSVG(true)} ${p.score}</div>`;
     if(isTouchDevice){
       // En móvil no hay "hover" — el primer toque solo resalta el pin en el
       // mapa, y hay que tocar una segunda vez para entrar a la ficha.
@@ -2041,8 +2062,8 @@ function toggleFav(evt,detail){
   if(!currentUser){ showLoginPrompt('Inicia sesión o regístrate para guardar favoritos.'); return; }
   const btn=evt.currentTarget;
   const idx=favorites.findIndex(f=>f.id===detail.id);
-  if(idx>=0){favorites.splice(idx,1);btn.textContent='♡';btn.classList.remove('saved');}
-  else{favorites.push({...detail,addedAt:new Date().toISOString()});btn.textContent='♥';btn.classList.add('saved');}
+  if(idx>=0){favorites.splice(idx,1);btn.innerHTML=heartSVG(false);btn.classList.remove('saved');}
+  else{favorites.push({...detail,addedAt:new Date().toISOString()});btn.innerHTML=heartSVG(true);btn.classList.add('saved');}
   localStorage.setItem('gm_favs',JSON.stringify(favorites));
   updateFavCount();
 }
@@ -2104,7 +2125,7 @@ async function renderMyReviews(){
       <div class="review-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <strong>${r.restaurant_name}</strong>
-          <span style="color:var(--orange)">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
+          <span>${starRatingHTML(r.rating)}</span>
         </div>
         <div style="font-size:13px;color:var(--textm);line-height:1.5;margin-bottom:6px">${r.text}</div>
         <div style="font-size:11px;color:var(--textl)">${new Date(r.created_at).toLocaleDateString('es-ES')}</div>
@@ -2127,7 +2148,7 @@ function favLocation(f){
 function renderFavs(){
   const list=document.getElementById('favs-list');
   if(!favorites.length){
-    list.innerHTML='<div class="favs-empty"><div class="favs-empty-icon">♡</div><div class="empty-title">Sin favoritos aún</div><div class="empty-sub">Guarda restaurantes desde Explorar o el Mapa.</div></div>';
+    list.innerHTML='<div class="favs-empty"><div class="favs-empty-icon"><svg width="22" height="22" viewBox="0 0 24 24" style="vertical-align:-3px"><path d="M12,21.35l-1.45-1.32C5.4,15.36,2,12.28,2,8.5 2,5.42,4.42,3,7.5,3c1.74,0,3.41,0.81,4.5,2.09C13.09,3.81,14.76,3,16.5,3 19.58,3,22,5.42,22,8.5c0,3.78-3.4,6.86-8.55,11.54L12,21.35z" fill="none" stroke="#C8C3B8" stroke-width="1.3" stroke-linejoin="round"/></svg></div><div class="empty-title">Sin favoritos aún</div><div class="empty-sub">Guarda restaurantes desde Explorar o el Mapa.</div></div>';
     document.getElementById('favs-cuisine-filter').innerHTML='<option value="">Todas las cocinas</option>';
     document.getElementById('favs-location-filter').innerHTML='<option value="">Todas las ubicaciones</option>';
     return;
@@ -2158,12 +2179,12 @@ function renderFavs(){
   }
   window.__lastFavsList=filtered;
   list.innerHTML=filtered.map((f,i)=>`<div class="fav-item" style="cursor:pointer" onclick="openRestaurant(window.__lastFavsList[${i}])">
-    <div class="fav-heart">♥</div>
+    <div class="fav-heart">${heartSVG(true,15)}</div>
     <div class="fav-info">
       <div class="fav-name">${f.name}</div>
       <div class="fav-city">${f.cuisine?f.cuisine+' · ':''}${favLocation(f)}</div>
     </div>
-    ${f.score?`<div style="font-size:13px;font-weight:700;color:var(--orange);white-space:nowrap;margin-right:8px">★ ${f.score}</div>`:''}
+    ${f.score?`<div style="font-size:13px;font-weight:700;color:var(--orange);white-space:nowrap;margin-right:8px">${starSVG(true)} ${f.score}</div>`:''}
     <button class="fav-del" onclick="event.stopPropagation();removeFav('${f.id}')">🗑</button>
   </div>`).join('');
 }
@@ -2204,7 +2225,7 @@ function renderTrending(){
         <img src="${d.photo}" alt="${d.name}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
         <div class="trend-overlay"></div>
         <div class="trend-stats">
-          <div class="trend-stat">♥ ${d.likes}</div>
+          <div class="trend-stat">${heartSVG(true,15)} ${d.likes}</div>
           <div class="trend-stat">💬 ${d.comments}</div>
         </div>
         <div class="trend-content">
@@ -2399,7 +2420,7 @@ function openRestaurant(d){
           <div class="detail-hero-score">${d.score}</div>
         </div>
         <div class="detail-meta-row">
-          <div class="detail-rating">★ ${d.rating} <span>(${d.reviewCount} reseñas)</span></div>
+          <div class="detail-rating">${starSVG(true,18)} ${d.rating} <span>(${d.reviewCount} reseñas)</span></div>
           <span class="tag">${d.cuisine}</span>
           ${(d.badges||[]).map(b=>`<span class="tag tag-top">${b}</span>`).join('')}
         </div>
@@ -2407,7 +2428,7 @@ function openRestaurant(d){
           <button class="detail-btn primary" onclick="showOnGastroMap(window.__lastDetailD)">📍 Ver en el mapa</button>
           ${d.phone?`<a class="detail-btn" href="tel:${d.phone}">📞 Llamar</a>`:''}
           ${d.website?`<a class="detail-btn" href="${d.website}" target="_blank" rel="noopener">🌐 Web</a>`:''}
-          <button class="detail-btn" onclick="toggleFav(event,${JSON.stringify(d).replace(/"/g,'&quot;')})">${isSaved?'♥ Guardado':'♡ Guardar'}</button>
+          <button class="detail-btn" onclick="toggleFav(event,${JSON.stringify(d).replace(/"/g,'&quot;')})">${isSaved?heartSVG(true,15)+' Guardado':heartSVG(false,15)+' Guardar'}</button>
         </div>
         <div class="detail-tabs">
           <button class="detail-tab active" id="tab-btn-resenas" onclick="detailTab(this,'resenas')">Reseñas (0)</button>
@@ -2448,11 +2469,11 @@ function openRestaurant(d){
         <h3>🏠 Locales vs. 🧳 Turistas</h3>
         <div style="display:flex;gap:12px;margin:14px 0">
           <div style="flex:1;text-align:center;padding:16px 8px;background:var(--g1);border-radius:12px">
-            <div style="font-size:26px;font-weight:700;color:#1D9E75">★ ${lt.local}</div>
+            <div style="font-size:26px;font-weight:700;color:#1D9E75">${starSVG(true,22)} ${lt.local}</div>
             <div style="font-size:11px;color:var(--textl);margin-top:4px">🏠 Valoración local</div>
           </div>
           <div style="flex:1;text-align:center;padding:16px 8px;background:var(--g1);border-radius:12px">
-            <div style="font-size:26px;font-weight:700;color:var(--orange)">★ ${lt.tourist}</div>
+            <div style="font-size:26px;font-weight:700;color:var(--orange)">${starSVG(true,22)} ${lt.tourist}</div>
             <div style="font-size:11px;color:var(--textl);margin-top:4px">🧳 Valoración turista</div>
           </div>
         </div>
@@ -2475,7 +2496,7 @@ function detailTab(btn,tab){
 let selectedReviewStars=0;
 function setReviewStars(n){
   selectedReviewStars=n;
-  document.querySelectorAll('#review-stars span').forEach((s,i)=>s.textContent=i<n?'★':'☆');
+  document.querySelectorAll('#review-stars span').forEach((s,i)=>s.innerHTML=i<n?starSVG(true,22):starSVG(false,22));
 }
 function hoverReviewStars(n){
   document.querySelectorAll('#review-stars span').forEach((s,i)=>s.classList.toggle('hovered',i<n));
@@ -2490,7 +2511,7 @@ function renderReviewForm(){
   selectedReviewStars=0;
   area.innerHTML=`
     <h3>Deja tu reseña</h3>
-    <div class="star-select" id="review-stars">${[1,2,3,4,5].map(n=>`<span onclick="setReviewStars(${n})" onmouseover="hoverReviewStars(${n})" onmouseout="hoverReviewStars(0)">☆</span>`).join('')}</div>
+    <div class="star-select" id="review-stars">${[1,2,3,4,5].map(n=>`<span onclick="setReviewStars(${n})" onmouseover="hoverReviewStars(${n})" onmouseout="hoverReviewStars(0)">${starSVG(false,22)}</span>`).join('')}</div>
     <div class="ia-field"><textarea class="ia-input" id="review-text" rows="3" placeholder="Comparte tu experiencia…"></textarea></div>
     <button class="btn-ia" onclick="submitReview()">➤ Publicar Reseña</button>
   `;
@@ -2534,7 +2555,7 @@ async function loadReviews(restaurantId){
       <div class="review-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <strong>${r.user_name}</strong>
-          <span style="color:var(--orange)">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
+          <span>${starRatingHTML(r.rating)}</span>
         </div>
         <div style="font-size:13px;color:var(--textm);line-height:1.5;margin-bottom:6px">${r.text}</div>
         <div style="font-size:11px;color:var(--textl)">${new Date(r.created_at).toLocaleDateString('es-ES')}</div>
@@ -3014,7 +3035,7 @@ function renderCreators(filter='all',search=''){
       <div class="creator-bio">${c.bio}</div>
       <div class="creator-stats-row">
         <div class="cstat"><div class="cstat-num">${c.followers}</div><div class="cstat-lbl">seguidores</div></div>
-        <div class="cstat"><div class="cstat-num">★ ${c.reviews}</div><div class="cstat-lbl">reseñas</div></div>
+        <div class="cstat"><div class="cstat-num">${starSVG(true)} ${c.reviews}</div><div class="cstat-lbl">reseñas</div></div>
       </div>
       <div class="creator-cities">${c.cities.map(ci=>`<span class="city-tag">📍 ${ci}</span>`).join('')}</div>
       <button class="follow-btn ${following.has(c.handle)?'following':''}" onclick="event.stopPropagation();toggleFollow(this,'${c.handle}')">${following.has(c.handle)?'✓ Siguiendo':'Seguir'}</button>
