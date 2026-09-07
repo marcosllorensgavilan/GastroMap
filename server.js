@@ -234,6 +234,21 @@ app.delete('/api/reviews/mine', requireAuth, (req, res) => {
   res.json({ ok: true, deleted: info.changes });
 });
 
+// Distancia de edición — cuántos cambios de letra hacen falta para pasar de
+// una palabra a otra. Se usa para tolerar erratas al buscar por nombre.
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
 function fakeScore(name) {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
@@ -338,12 +353,40 @@ app.get('/api/restaurants/search', (req, res) => {
   if (!q || q.length < 2) {
     return res.status(400).json({ error: 'Escribe al menos 2 letras para buscar.' });
   }
-  const rows = db.prepare(`
+  let rows = db.prepare(`
     SELECT * FROM restaurants
     WHERE name LIKE '%' || ? || '%' COLLATE NOCASE
     ORDER BY (name LIKE ? || '%' COLLATE NOCASE) DESC, name COLLATE NOCASE ASC
     LIMIT ?
   `).all(q, q, limit);
+
+  let fuzzy = false;
+  if (rows.length === 0 && q.length >= 3) {
+    // Sin coincidencia exacta — probablemente una errata. Buscamos candidatos
+    // que contengan un trocito parecido en CUALQUIER parte del nombre (no
+    // solo al principio, porque muchos locales tienen varias palabras, tipo
+    // "Restaurante El Gaucho"), y comparamos la errata contra cada palabra
+    // del nombre por separado, quedándonos con la que más se le parezca.
+    const prefix = q.slice(0, Math.max(2, q.length - 2));
+    const candidates = db.prepare(`
+      SELECT * FROM restaurants
+      WHERE name LIKE '%' || ? || '%' COLLATE NOCASE
+      LIMIT 400
+    `).all(prefix);
+    const qLower = q.toLowerCase();
+    const tolerance = Math.max(1, Math.floor(q.length / 3));
+    rows = candidates
+      .map(r => {
+        const words = (r.name || '').toLowerCase().split(/\s+/);
+        const dist = Math.min(...words.map(w => levenshtein(qLower, w)));
+        return { r, dist };
+      })
+      .filter(x => x.dist <= tolerance)
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, limit)
+      .map(x => x.r);
+    fuzzy = rows.length > 0;
+  }
 
   const places = rows.map(r => ({
     id: r.ogc_fid,
@@ -361,7 +404,7 @@ app.get('/api/restaurants/search', (req, res) => {
     score: fakeScore(r.name),
     reviews: fakeReviews(r.name),
   }));
-  res.json({ places, count: places.length });
+  res.json({ places, count: places.length, fuzzy });
 });
 
 app.get('/api/health', (req, res) => {

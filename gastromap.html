@@ -1648,6 +1648,31 @@ async function loadMapArea(){
   }
 }
 // Diccionario de platos/tipos de cocina reconocidos → qué buscar en el tag "cuisine" de OSM
+// Palabras que se refieren al TIPO de local (restaurante, cafetería, bar...)
+// en vez de a un plato o cocina concreta — se buscan por "amenity", no por
+// "cuisine". Incluye singular/plural y con/sin tilde, porque el usuario
+// puede escribir cualquiera de las dos formas.
+const AMENITY_KEYWORDS={
+  'restaurante':'restaurant','restaurantes':'restaurant',
+  'cafeteria':'cafe','cafeterias':'cafe','cafetería':'cafe','cafeterías':'cafe','cafe':'cafe','cafes':'cafe','café':'cafe','cafés':'cafe',
+  'bar':'bar','bares':'bar',
+  'panaderia':'bakery','panaderias':'bakery','panadería':'bakery','panaderías':'bakery',
+  'pub':'pub','pubs':'pub',
+  'heladeria':'ice_cream','heladerias':'ice_cream','heladería':'ice_cream','heladerías':'ice_cream',
+  'comida rapida':'fast_food','comida rápida':'fast_food'
+};
+function matchAmenityKeyword(text){
+  const q=text.toLowerCase().trim().replace(' cerca de mi','').replace(' cerca de mí','').trim();
+  if(AMENITY_KEYWORDS[q]) return AMENITY_KEYWORDS[q];
+  let best=null, bestDist=Infinity;
+  const tolerance = q.length<=4 ? 1 : 2;
+  for(const key in AMENITY_KEYWORDS){
+    if(Math.abs(key.length-q.length)>tolerance) continue;
+    const d=levenshtein(q,key);
+    if(d<=tolerance && d<bestDist){ bestDist=d; best=AMENITY_KEYWORDS[key]; }
+  }
+  return best;
+}
 const FOOD_KEYWORDS={
   'tapas':['tapas','spanish'],'paella':['spanish','paella'],'marisco':['seafood','fish'],'mariscos':['seafood','fish'],
   'pasta':['italian','pasta'],'pizza':['pizza','italian'],'sushi':['japanese','sushi'],'ramen':['japanese','ramen'],
@@ -1659,9 +1684,35 @@ const FOOD_KEYWORDS={
   'pinchos':['spanish','tapas'],'italiana':['italian'],'japonesa':['japanese'],'griega':['greek'],'thai':['thai'],'tailandesa':['thai'],
   'coreana':['korean'],'peruana':['peruvian'],'libanesa':['lebanese'],'marroqui':['moroccan'],'poke':['poke','hawaiian']
 };
+// Distancia de edición (Levenshtein) — cuenta cuántos cambios de letra hacen
+// falta para pasar de una palabra a otra. La usamos para tolerar erratas:
+// "tpaas" está a distancia 2 de "tapas", así que lo reconocemos igual.
+function levenshtein(a,b){
+  const m=a.length,n=b.length;
+  const dp=Array.from({length:m+1},()=>new Array(n+1).fill(0));
+  for(let i=0;i<=m;i++) dp[i][0]=i;
+  for(let j=0;j<=n;j++) dp[0][j]=j;
+  for(let i=1;i<=m;i++){
+    for(let j=1;j<=n;j++){
+      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
+}
 function matchFoodKeyword(text){
   const q=text.toLowerCase().trim();
-  return FOOD_KEYWORDS[q]||null;
+  if(FOOD_KEYWORDS[q]) return FOOD_KEYWORDS[q];
+  // No hay coincidencia exacta — probamos si es una errata de alguna palabra
+  // conocida (tolerancia proporcional a la longitud: palabras cortas admiten
+  // 1 error, las más largas hasta 2).
+  let best=null, bestDist=Infinity;
+  const tolerance = q.length<=4 ? 1 : 2;
+  for(const key in FOOD_KEYWORDS){
+    if(Math.abs(key.length-q.length)>tolerance) continue;
+    const d=levenshtein(q,key);
+    if(d<=tolerance && d<bestDist){ bestDist=d; best=FOOD_KEYWORDS[key]; }
+  }
+  return best;
 }
 function getCurrentLocation(){
   return new Promise((resolve,reject)=>{
@@ -1693,6 +1744,27 @@ async function searchByFoodKeyword(query,cuisineMatches){
     document.getElementById('map-stats').innerHTML='No encontré sitios de "'+query+'" cerca — te muestro todo lo que hay en la zona.';
   }
 }
+// Para "cafeterías", "restaurantes", "bares"... — a diferencia de la cocina,
+// esto se filtra por tipo de local (amenity), y se lo pedimos directamente
+// al servidor en vez de filtrar en el navegador, para que use el mismo
+// reparto por rejilla que ya usa el resto del mapa.
+async function searchByAmenityKeyword(query,amenity){
+  const loc=await getCurrentLocation();
+  suppressMoveUntil=Date.now()+1200;
+  mapJumpTo(loc.lat,loc.lon,14);
+  const b=leafletMap.getBounds();
+  const places=await fetchOSMBBox(b.getSouth(),b.getNorth(),b.getWest(),b.getEast(),amenity,null);
+  mapCategoryFilter=amenity; mapCuisineFilter='Todas';
+  allOSMMap=places;
+  updateCuisineDropdown(places);
+  document.getElementById('map-filters').style.display='flex';
+  const catIndex={todos:0,restaurant:1,cafe:2,bar:3,bakery:4}[amenity];
+  document.querySelectorAll('#map-filters .filter-btn').forEach((btn,i)=>btn.classList.toggle('active',i===catIndex));
+  renderMapResults(places);
+  if(!places.length){
+    document.getElementById('map-stats').innerHTML='No encontré "'+query+'" cerca de ti.';
+  }
+}
 async function mapSearch(){
   const query = document.getElementById('map-city-input').value.trim();
   if(!query||!leafletMap) return;
@@ -1701,6 +1773,14 @@ async function mapSearch(){
   document.getElementById('map-loading').classList.add('show');
   document.getElementById('map-stats').innerHTML='Buscando…';
   try{
+    // "cafeterías", "restaurantes", "bares"... — tipo de local, cerca de ti.
+    const amenityMatch=matchAmenityKeyword(query);
+    if(amenityMatch){
+      document.getElementById('map-stats').innerHTML='Buscando "'+query+'" cerca de ti…';
+      await searchByAmenityKeyword(query,amenityMatch);
+      return;
+    }
+    // "tapas", "sushi", "vegano"... — tipo de cocina, cerca de ti.
     const cuisineMatches=matchFoodKeyword(query);
     if(cuisineMatches){
       document.getElementById('map-stats').innerHTML='Buscando "'+query+'" cerca de ti…';
@@ -1724,11 +1804,14 @@ async function mapSearch(){
     }
     const nameMatches = await searchRestaurantsByName(query);
     if(nameMatches.length){
-      pendingHighlightId = nameMatches[0].id;
+      const best=nameMatches[0];
+      pendingHighlightId = best.id;
       suppressMoveUntil=Date.now()+1200;
-      mapFlyTo(nameMatches[0].lat,nameMatches[0].lon,16);
-      renderMapResults(nameMatches);
-      if(markersById[pendingHighlightId]){ highlightMapMarker(pendingHighlightId); pendingHighlightId=null; }
+      // Cargamos toda la zona alrededor del resultado (como el resto de
+      // restaurantes cercanos), con este resaltado entre los demás — no
+      // mostramos solo el resultado suelto, aislado del resto del mapa.
+      mapJumpTo(best.lat,best.lon,16);
+      await loadMapArea();
       return;
     }
     document.getElementById('map-stats').innerHTML = `Sin resultados para "${query}"`;
