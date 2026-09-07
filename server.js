@@ -257,6 +257,8 @@ const CANDIDATE_QUERY = db.prepare(`
   WHERE lat BETWEEN ? AND ?
     AND lon BETWEEN ? AND ?
     AND name IS NOT NULL
+    AND (? IS NULL OR amenity = ?)
+    AND (? IS NULL OR cuisine LIKE '%' || ? || '%')
   LIMIT 50000
 `);
 
@@ -266,12 +268,14 @@ app.get('/api/restaurants', (req, res) => {
   const w = parseFloat(req.query.w);
   const e = parseFloat(req.query.e);
   const limit = Math.min(parseInt(req.query.limit || '200', 10), 500);
+  const amenity = req.query.amenity && req.query.amenity !== 'todos' ? req.query.amenity : null;
+  const cuisine = req.query.cuisine && req.query.cuisine !== 'Todas' ? req.query.cuisine : null;
 
   if ([s, n, w, e].some(Number.isNaN)) {
     return res.status(400).json({ error: 'Faltan parámetros de bounding box: s, n, w, e' });
   }
 
-  const candidates = CANDIDATE_QUERY.all(s, n, w, e);
+  const candidates = CANDIDATE_QUERY.all(s, n, w, e, amenity, amenity, cuisine, cuisine);
 
   // Reparte los candidatos en una rejilla (12x12) sobre la zona visible, y
   // ordena cada celda por puntuación. Así, aunque haya miles de resultados

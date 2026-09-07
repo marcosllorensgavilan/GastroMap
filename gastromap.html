@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GastroMap — Descubre dónde come el mundo</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="anonymous">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="anonymous">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -1114,7 +1112,6 @@ a{text-decoration:none;color:inherit}
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin="anonymous"></script>
 <script>
 window.addEventListener('error', function(e){
   console.error('[GastroMap error]', e.message, 'at', e.filename+':'+e.lineno, e.error);
@@ -1324,7 +1321,7 @@ function fakeReviews(name){
 // localhost como en la IP local del Mac, para que el móvil también pueda usarlo).
 const LOCAL_DB_URL = '';
 
-async function fetchOSMBBox(s,n,w,e){
+async function fetchOSMBBox(s,n,w,e,amenity,cuisine){
   // 1) Intenta primero tu base de datos local — más rápida y no depende de
   //    Overpass ni de los bloqueos de red en España. Pero si no tiene datos
   //    para esta zona (p.ej. un usuario español de viaje en Australia),
@@ -1334,7 +1331,10 @@ async function fetchOSMBBox(s,n,w,e){
   try{
     const ctrl=new AbortController();
     const t=setTimeout(()=>ctrl.abort(),3000);
-    const resp=await fetch(`${LOCAL_DB_URL}/api/restaurants?s=${s}&n=${n}&w=${w}&e=${e}&limit=500`,{signal:ctrl.signal});
+    let url=`${LOCAL_DB_URL}/api/restaurants?s=${s}&n=${n}&w=${w}&e=${e}&limit=60`;
+    if(amenity && amenity!=='todos') url+=`&amenity=${encodeURIComponent(amenity)}`;
+    if(cuisine && cuisine!=='Todas') url+=`&cuisine=${encodeURIComponent(cuisine)}`;
+    const resp=await fetch(url,{signal:ctrl.signal});
     clearTimeout(t);
     if(resp.ok){
       const data=await resp.json();
@@ -1711,21 +1711,30 @@ async function mapSearch(){
   }
 }
 let mapCategoryFilter='todos', mapCuisineFilter='Todas';
-function mapFiltrar(btn,tipo){
+async function mapFiltrar(btn,tipo){
   document.querySelectorAll('#map-filters .filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   mapCategoryFilter=tipo;
-  applyMapFilters();
+  await refetchMapWithFilters();
 }
-function mapFiltrarCocina(cuisine){
+async function mapFiltrarCocina(cuisine){
   mapCuisineFilter=cuisine;
-  applyMapFilters();
+  await refetchMapWithFilters();
 }
-function applyMapFilters(){
-  let filtered=allOSMMap;
-  if(mapCategoryFilter!=='todos') filtered=filtered.filter(p=>p.tags.amenity===mapCategoryFilter);
-  if(mapCuisineFilter!=='Todas') filtered=filtered.filter(p=>(fmtCuisine(p.tags)||cap(p.tags.amenity))===mapCuisineFilter);
-  renderMapResults(filtered);
+async function refetchMapWithFilters(){
+  if(!leafletMap) return;
+  const b=leafletMap.getBounds();
+  document.getElementById('map-loading').classList.add('show');
+  const statsEl=document.getElementById('map-stats');
+  statsEl.innerHTML='Aplicando filtro…';
+  try{
+    const places=await fetchOSMBBox(b.getSouth(),b.getNorth(),b.getWest(),b.getEast(),mapCategoryFilter,mapCuisineFilter);
+    renderMapResults(places);
+  }catch(e){
+    statsEl.innerHTML=`<span style="color:var(--textl)">No se pudo aplicar el filtro, sigue explorando</span>`;
+  }finally{
+    document.getElementById('map-loading').classList.remove('show');
+  }
 }
 function updateCuisineDropdown(places){
   const sel=document.getElementById('map-cuisine-filter');
@@ -1787,20 +1796,9 @@ function renderMapResults(places){
     return;
   }
 
-  const shown = places.slice(0,500);
+  const shown = places.slice(0,60);
   clearMapMarkers(); // solo se ven los restaurantes de la zona actual, no todo lo explorado antes
-  geoLayerGroup=L.markerClusterGroup({
-    maxClusterRadius:60,
-    spiderfyOnMaxZoom:true,
-    iconCreateFunction:function(cluster){
-      const count=cluster.getChildCount();
-      const size = count<10?36 : count<50?42 : 48;
-      return L.divIcon({
-        html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:var(--navy);border:3px solid var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${count<100?13:11}px;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${count}</div>`,
-        className:'', iconSize:[size,size]
-      });
-    }
-  }).addTo(leafletMap);
+  geoLayerGroup=L.layerGroup().addTo(leafletMap);
 
   shown.forEach((p,i)=>{
     const isTop=i<3;
