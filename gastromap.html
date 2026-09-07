@@ -1839,8 +1839,10 @@ function gastroPinSVG(isTop,isHighlighted){
 function markerIcon(isTop,isHighlighted){
   const el=document.createElement('div');
   el.className='gm-pin-wrap';
-  el.style.cursor='pointer';
   const size=isHighlighted?[42,53]:[30,38];
+  el.style.cursor='pointer';
+  el.style.width=size[0]+'px';
+  el.style.height=size[1]+'px';
   el.innerHTML=`<div class="gm-pin-svg" style="width:${size[0]}px;height:${size[1]}px">${gastroPinSVG(isTop,isHighlighted)}</div><div class="gm-pin-tooltip"></div>`;
   return el;
 }
@@ -1933,6 +1935,8 @@ function setMarkerVisual(marker,isHighlighted){
   const el=marker.getElement();
   const svgWrap=el.querySelector('.gm-pin-svg');
   const size=isHighlighted?[42,53]:[30,38];
+  el.style.width=size[0]+'px';
+  el.style.height=size[1]+'px';
   svgWrap.style.width=size[0]+'px';
   svgWrap.style.height=size[1]+'px';
   svgWrap.innerHTML=gastroPinSVG(marker._isTop,isHighlighted);
