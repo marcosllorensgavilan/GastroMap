@@ -1778,32 +1778,15 @@ function gastroPinSVG(isTop,isHighlighted){
     return `<svg width="30" height="38" viewBox="0 0 30 38" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.4))">
       <defs><linearGradient id="pgh" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#EF6F62"/><stop offset="100%" stop-color="#C1372B"/></linearGradient></defs>
       <path d="M15 0C6.7 0 0 6.7 0 15c0 10.9 15 23 15 23s15-12.1 15-23C30 6.7 23.3 0 15 0z" fill="url(#pgh)" stroke="white" stroke-width="2"/>
-      <circle cx="15" cy="14.5" r="6.5" fill="none" stroke="white" stroke-width="1.8"/>
-      <g transform="translate(15,8.2)" fill="white">
-        <rect x="-3.6" y="0" width="1.3" height="5.5" rx="0.6"/>
-        <rect x="-0.65" y="0" width="1.3" height="5.5" rx="0.6"/>
-        <rect x="2.3" y="0" width="1.3" height="5.5" rx="0.6"/>
-        <path d="M -3.9 5.2 Q -3.9 7.4 -0.65 7.4 L 0.35 7.4 Q 3.6 7.4 3.6 5.2 L 3.6 4.6 L -3.9 4.6 Z"/>
-        <rect x="-0.65" y="6.8" width="1.3" height="6" rx="0.6"/>
-      </g>
+      <circle cx="15" cy="13" r="5.5" fill="none" stroke="white" stroke-width="1.8"/>
     </svg>`;
   }
-  const gradId = isTop ? 'pg1' : 'pg0';
-  const grad = isTop
-    ? `<linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F3CE7E"/><stop offset="100%" stop-color="#D08A2E"/></linearGradient>`
-    : `<linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2A2420"/><stop offset="100%" stop-color="#1A1613"/></linearGradient>`;
-  const ring = isTop ? '#1A1613' : '#E0995C';
+  // Mismo diseño que el logo: pin dorado con un aro en el medio, sin tenedor
+  // dibujado dentro — así los pines del mapa coinciden con la marca.
   return `<svg width="30" height="38" viewBox="0 0 30 38" xmlns="http://www.w3.org/2000/svg" style="display:block">
-    <defs>${grad}</defs>
-    <path d="M15 0C6.7 0 0 6.7 0 15c0 10.9 15 23 15 23s15-12.1 15-23C30 6.7 23.3 0 15 0z" fill="url(#${gradId})" stroke="white" stroke-width="1.5"/>
-    <circle cx="15" cy="14.5" r="6.5" fill="none" stroke="${ring}" stroke-width="1.6"/>
-    <g transform="translate(15,8.2)" fill="${ring}">
-      <rect x="-3.6" y="0" width="1.3" height="5.5" rx="0.6"/>
-      <rect x="-0.65" y="0" width="1.3" height="5.5" rx="0.6"/>
-      <rect x="2.3" y="0" width="1.3" height="5.5" rx="0.6"/>
-      <path d="M -3.9 5.2 Q -3.9 7.4 -0.65 7.4 L 0.35 7.4 Q 3.6 7.4 3.6 5.2 L 3.6 4.6 L -3.9 4.6 Z"/>
-      <rect x="-0.65" y="6.8" width="1.3" height="6" rx="0.6"/>
-    </g>
+    <defs><linearGradient id="pg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F3CE7E"/><stop offset="100%" stop-color="#D08A2E"/></linearGradient></defs>
+    <path d="M15 0C6.7 0 0 6.7 0 15c0 10.9 15 23 15 23s15-12.1 15-23C30 6.7 23.3 0 15 0z" fill="url(#pg1)" stroke="white" stroke-width="1.5"/>
+    <circle cx="15" cy="13" r="5.5" fill="none" stroke="white" stroke-width="1.6"/>
   </svg>`;
 }
 // Icono del pin — normal (30x38) o resaltado (42x53, más grande para que se
