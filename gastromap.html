@@ -1511,8 +1511,19 @@ async function heroSearch(){
   resetCategoryFilters();
   document.getElementById('explorar-filters').style.display='flex';
   try{
-    // Primero probamos si coincide con nombres de restaurantes de verdad
-    // (búsqueda parcial: "el gaucho" encuentra "Bar Restaurante El Gaucho").
+    // Primero probamos si es una ciudad o lugar real — así "Godella" (o
+    // cualquier pueblo) carga toda la zona, en vez de que gane por
+    // casualidad un único restaurante que coincida parcialmente por nombre.
+    try{
+      const {places} = await fetchOSMCity(city);
+      explorarPlaces = places;
+      title.innerHTML = `Top <em>${cap(city)}</em>`;
+      document.getElementById('explorar-count').textContent = places.length+' restaurantes';
+      renderExplorar(places);
+      return;
+    }catch(cityErr){
+      // No es un lugar reconocible — probamos como nombre de restaurante.
+    }
     const nameMatches = await searchRestaurantsByName(city);
     if(nameMatches.length){
       explorarPlaces = nameMatches;
@@ -1521,11 +1532,7 @@ async function heroSearch(){
       renderExplorar(nameMatches);
       return;
     }
-    const {places} = await fetchOSMCity(city);
-    explorarPlaces = places;
-    title.innerHTML = `Top <em>${cap(city)}</em>`;
-    document.getElementById('explorar-count').textContent = places.length+' restaurantes';
-    renderExplorar(places);
+    res.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">Sin resultados</div><div class="empty-sub">No encontramos nada para "'+city+'"</div></div>';
   }catch(e){
     res.innerHTML='<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">No encontrado</div><div class="empty-sub">'+e.message+'</div></div>';
   }
@@ -1681,7 +1688,27 @@ async function mapSearch(){
   document.getElementById('map-loading').classList.add('show');
   document.getElementById('map-stats').innerHTML='Buscando…';
   try{
-    // Primero probamos si es el nombre (o parte del nombre) de un restaurante real.
+    const cuisineMatches=matchFoodKeyword(query);
+    if(cuisineMatches){
+      document.getElementById('map-stats').innerHTML='Buscando "'+query+'" cerca de ti…';
+      await searchByFoodKeyword(query,cuisineMatches);
+      return;
+    }
+    // Primero probamos si es una ciudad o lugar real — así "Godella" (o
+    // cualquier pueblo) carga toda la zona, en vez de que gane por
+    // casualidad un único restaurante que coincida parcialmente por nombre.
+    try{
+      const {lat,lon} = await fetchOSMCity(query);
+      suppressMoveUntil=Date.now()+1200;
+      // Vamos directos a zoom de ciudad (14) — el bounding box que devuelve
+      // Nominatim a veces cubre toda el área metropolitana o la provincia,
+      // lo que dejaría el mapa demasiado alejado para cargar datos.
+      leafletMap.setView([lat,lon],14,{animate:true});
+      await loadMapArea();
+      return;
+    }catch(cityErr){
+      // No es un lugar reconocible — probamos como nombre de restaurante.
+    }
     const nameMatches = await searchRestaurantsByName(query);
     if(nameMatches.length){
       pendingHighlightId = nameMatches[0].id;
@@ -1691,19 +1718,7 @@ async function mapSearch(){
       if(markersById[pendingHighlightId]){ highlightMapMarker(pendingHighlightId); pendingHighlightId=null; }
       return;
     }
-    const cuisineMatches=matchFoodKeyword(query);
-    if(cuisineMatches){
-      document.getElementById('map-stats').innerHTML='Buscando "'+query+'" cerca de ti…';
-      await searchByFoodKeyword(query,cuisineMatches);
-    }else{
-      const {lat,lon} = await fetchOSMCity(query);
-      suppressMoveUntil=Date.now()+1200;
-      // Vamos directos a zoom de ciudad (14) — el bounding box que devuelve
-      // Nominatim a veces cubre toda el área metropolitana o la provincia,
-      // lo que dejaría el mapa demasiado alejado para cargar datos.
-      leafletMap.setView([lat,lon],14,{animate:true});
-      await loadMapArea();
-    }
+    document.getElementById('map-stats').innerHTML = `Sin resultados para "${query}"`;
   }catch(e){
     document.getElementById('map-stats').textContent='Error: '+e.message;
   }finally{
