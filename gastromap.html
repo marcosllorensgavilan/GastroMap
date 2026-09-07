@@ -1661,9 +1661,12 @@ const AMENITY_KEYWORDS={
   'heladeria':'ice_cream','heladerias':'ice_cream','heladería':'ice_cream','heladerías':'ice_cream',
   'comida rapida':'fast_food','comida rápida':'fast_food'
 };
-function matchAmenityKeyword(text){
+function matchAmenityKeywordExact(text){
   const q=text.toLowerCase().trim().replace(' cerca de mi','').replace(' cerca de mí','').trim();
-  if(AMENITY_KEYWORDS[q]) return AMENITY_KEYWORDS[q];
+  return AMENITY_KEYWORDS[q]||null;
+}
+function matchAmenityKeywordFuzzy(text){
+  const q=text.toLowerCase().trim().replace(' cerca de mi','').replace(' cerca de mí','').trim();
   let best=null, bestDist=Infinity;
   const tolerance = q.length<=4 ? 1 : 2;
   for(const key in AMENITY_KEYWORDS){
@@ -1672,6 +1675,9 @@ function matchAmenityKeyword(text){
     if(d<=tolerance && d<bestDist){ bestDist=d; best=AMENITY_KEYWORDS[key]; }
   }
   return best;
+}
+function matchAmenityKeyword(text){
+  return matchAmenityKeywordExact(text) || matchAmenityKeywordFuzzy(text);
 }
 const FOOD_KEYWORDS={
   'tapas':['tapas','spanish'],'paella':['spanish','paella'],'marisco':['seafood','fish'],'mariscos':['seafood','fish'],
@@ -1699,12 +1705,12 @@ function levenshtein(a,b){
   }
   return dp[m][n];
 }
-function matchFoodKeyword(text){
+function matchFoodKeywordExact(text){
   const q=text.toLowerCase().trim();
-  if(FOOD_KEYWORDS[q]) return FOOD_KEYWORDS[q];
-  // No hay coincidencia exacta — probamos si es una errata de alguna palabra
-  // conocida (tolerancia proporcional a la longitud: palabras cortas admiten
-  // 1 error, las más largas hasta 2).
+  return FOOD_KEYWORDS[q]||null;
+}
+function matchFoodKeywordFuzzy(text){
+  const q=text.toLowerCase().trim();
   let best=null, bestDist=Infinity;
   const tolerance = q.length<=4 ? 1 : 2;
   for(const key in FOOD_KEYWORDS){
@@ -1713,6 +1719,9 @@ function matchFoodKeyword(text){
     if(d<=tolerance && d<bestDist){ bestDist=d; best=FOOD_KEYWORDS[key]; }
   }
   return best;
+}
+function matchFoodKeyword(text){
+  return matchFoodKeywordExact(text) || matchFoodKeywordFuzzy(text);
 }
 function getCurrentLocation(){
   return new Promise((resolve,reject)=>{
@@ -1773,23 +1782,24 @@ async function mapSearch(){
   document.getElementById('map-loading').classList.add('show');
   document.getElementById('map-stats').innerHTML='Buscando…';
   try{
-    // "cafeterías", "restaurantes", "bares"... — tipo de local, cerca de ti.
-    const amenityMatch=matchAmenityKeyword(query);
-    if(amenityMatch){
+    // Coincidencia EXACTA de palabra clave ("cafeterías", "tapas"...) — esto
+    // es una señal clara y deliberada, así que se comprueba ya de entrada.
+    const amenityExact=matchAmenityKeywordExact(query);
+    if(amenityExact){
       document.getElementById('map-stats').innerHTML='Buscando "'+query+'" cerca de ti…';
-      await searchByAmenityKeyword(query,amenityMatch);
+      await searchByAmenityKeyword(query,amenityExact);
       return;
     }
-    // "tapas", "sushi", "vegano"... — tipo de cocina, cerca de ti.
-    const cuisineMatches=matchFoodKeyword(query);
-    if(cuisineMatches){
+    const cuisineExact=matchFoodKeywordExact(query);
+    if(cuisineExact){
       document.getElementById('map-stats').innerHTML='Buscando "'+query+'" cerca de ti…';
-      await searchByFoodKeyword(query,cuisineMatches);
+      await searchByFoodKeyword(query,cuisineExact);
       return;
     }
-    // Primero probamos si es una ciudad o lugar real — así "Godella" (o
-    // cualquier pueblo) carga toda la zona, en vez de que gane por
-    // casualidad un único restaurante que coincida parcialmente por nombre.
+    // Antes de adivinar con tolerancia a erratas, probamos si es un sitio
+    // concreto de verdad — una ciudad/pueblo, o el nombre de un restaurante
+    // real (aunque sea corto y se parezca por casualidad a una palabra
+    // clave, como "Curro" o "Barra" — esos nombres reales tienen prioridad).
     try{
       const {lat,lon} = await fetchOSMCity(query);
       suppressMoveUntil=Date.now()+1200;
@@ -1812,6 +1822,20 @@ async function mapSearch(){
       // mostramos solo el resultado suelto, aislado del resto del mapa.
       mapJumpTo(best.lat,best.lon,16);
       await loadMapArea();
+      return;
+    }
+    // Último recurso: ni ciudad ni restaurante real — probamos si es una
+    // palabra clave con errata ("cafeterias" mal escrito, etc).
+    const amenityFuzzy=matchAmenityKeywordFuzzy(query);
+    if(amenityFuzzy){
+      document.getElementById('map-stats').innerHTML='Buscando "'+query+'" cerca de ti…';
+      await searchByAmenityKeyword(query,amenityFuzzy);
+      return;
+    }
+    const cuisineFuzzy=matchFoodKeywordFuzzy(query);
+    if(cuisineFuzzy){
+      document.getElementById('map-stats').innerHTML='Buscando "'+query+'" cerca de ti…';
+      await searchByFoodKeyword(query,cuisineFuzzy);
       return;
     }
     document.getElementById('map-stats').innerHTML = `Sin resultados para "${query}"`;
