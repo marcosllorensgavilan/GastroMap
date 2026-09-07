@@ -1589,7 +1589,17 @@ function initMap(){
   leafletMap.on('moveend zoomend',onMapMoved);
   if(isTouchDevice) leafletMap.on('dragstart click',()=>toggleMapSheet(false));
   setTimeout(()=>leafletMap.invalidateSize(),50);
-  loadMapArea();
+  // Como Google Maps o Apple Maps: si el navegador nos deja, abrimos ya
+  // centrados en la ubicación real de la persona, en vez de enseñar el
+  // mapamundi entero de entrada. Si no da permiso o falla, nos quedamos con
+  // la vista del mundo de siempre — no se rompe nada.
+  getCurrentLocation().then(loc=>{
+    suppressMoveUntil=Date.now()+1200;
+    leafletMap.setView([loc.lat,loc.lon],14,{animate:false});
+    loadMapArea();
+  }).catch(()=>{
+    loadMapArea();
+  });
 }
 // Estos tres ayudantes se dejan con el mismo nombre que antes (para no tener
 // que tocar todos los sitios que ya los llaman), pero ahora usan la API de
