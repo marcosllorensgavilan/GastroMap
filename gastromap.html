@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GastroMap — Descubre dónde come el mundo</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="anonymous">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -1112,6 +1114,7 @@ a{text-decoration:none;color:inherit}
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin="anonymous"></script>
 <script>
 window.addEventListener('error', function(e){
   console.error('[GastroMap error]', e.message, 'at', e.filename+':'+e.lineno, e.error);
@@ -1619,7 +1622,7 @@ async function loadMapArea(){
     if(seq!==mapLoadSeq) return;
     // No borramos nada de lo que ya había cargado — solo avisamos de que esta
     // zona en concreto no se pudo actualizar, sin perder lo que ya se ve.
-    statsEl.innerHTML = `<strong>${Object.keys(allLoadedPlaces).length}</strong> lugares descubiertos · <span style="color:var(--textl)">No se pudo actualizar esta zona, sigue explorando</span>`;
+    statsEl.innerHTML = `<span style="color:var(--textl)">No se pudo actualizar esta zona, sigue explorando</span>`;
   }finally{
     if(seq===mapLoadSeq) document.getElementById('map-loading').classList.remove('show');
   }
@@ -1775,22 +1778,31 @@ function markerIcon(isTop,isHighlighted){
   return L.divIcon({html:gastroPinSVG(isTop,false),className:'',iconSize:[30,38],iconAnchor:[15,38],popupAnchor:[0,-34],tooltipAnchor:[0,-30]});
 }
 
-let allLoadedPlaces={}; // acumula TODO lo descubierto en el mapa, para no perderlo al moverse
 function renderMapResults(places){
   const list = document.getElementById('map-list');
-  const totalPct = Object.keys(allLoadedPlaces).length;
   if(!places.length){
-    document.getElementById('map-stats').innerHTML=`<strong>${totalPct}</strong> lugares descubiertos · <span class="osm-badge"><span class="osm-dot"></span>OpenStreetMap</span>`;
-    if(!totalPct) list.innerHTML='<div class="map-empty"><div class="map-empty-icon">🔍</div><div class="map-empty-title">Sin resultados por aquí</div></div>';
-    return; // si ya había resultados de antes, los dejamos tal cual — no se pierden al moverte a una zona vacía
+    document.getElementById('map-stats').innerHTML=`<strong>0</strong> lugares en esta zona · <span class="osm-badge"><span class="osm-dot"></span>OpenStreetMap</span>`;
+    list.innerHTML='<div class="map-empty"><div class="map-empty-icon">🔍</div><div class="map-empty-title">Sin resultados por aquí</div></div>';
+    clearMapMarkers();
+    return;
   }
 
   const shown = places.slice(0,500);
-  if(!geoLayerGroup){ geoLayerGroup=L.layerGroup().addTo(leafletMap); }
+  clearMapMarkers(); // solo se ven los restaurantes de la zona actual, no todo lo explorado antes
+  geoLayerGroup=L.markerClusterGroup({
+    maxClusterRadius:60,
+    spiderfyOnMaxZoom:true,
+    iconCreateFunction:function(cluster){
+      const count=cluster.getChildCount();
+      const size = count<10?36 : count<50?42 : 48;
+      return L.divIcon({
+        html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:var(--navy);border:3px solid var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${count<100?13:11}px;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${count}</div>`,
+        className:'', iconSize:[size,size]
+      });
+    }
+  }).addTo(leafletMap);
 
   shown.forEach((p,i)=>{
-    allLoadedPlaces[p.id]=p;
-    if(markersById[p.id]) return; // ya estaba pintado de una pasada anterior, no lo duplicamos
     const isTop=i<3;
     const icon=markerIcon(isTop,false);
     const marker=L.marker([p.lat,p.lon],{icon}).addTo(geoLayerGroup);
@@ -1809,13 +1821,10 @@ function renderMapResults(places){
   });
   leafletMap.off('click',closeOpenTooltip);
   leafletMap.on('click',closeOpenTooltip);
-  document.getElementById('map-stats').innerHTML=`<strong>${Object.keys(allLoadedPlaces).length}</strong> lugares descubiertos · <span class="osm-badge"><span class="osm-dot"></span>OpenStreetMap</span>`;
+  document.getElementById('map-stats').innerHTML=`<strong>${shown.length}</strong> lugares en esta zona · <span class="osm-badge"><span class="osm-dot"></span>OpenStreetMap</span>`;
 
-  // La lista tiene que reflejar TODO lo acumulado, igual que los pines —
-  // no solo la última zona por la que hemos pasado.
   list.innerHTML='';
-  const allShown = Object.values(allLoadedPlaces).sort((a,b)=>b.score-a.score);
-  allShown.forEach(p=>{
+  shown.forEach(p=>{
     const cuisine=fmtCuisine(p.tags)||cap(p.tags.amenity);
     const item=document.createElement('div');
     item.className='map-item'; item.id='mitem-'+p.id;
@@ -1875,7 +1884,6 @@ function clearMapMarkers(){
   if(geoLayerGroup && leafletMap) leafletMap.removeLayer(geoLayerGroup);
   geoLayerGroup=null;
   markersById={};
-  allLoadedPlaces={};
 }
 
 
