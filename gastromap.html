@@ -1585,10 +1585,7 @@ let mapLoadTimer=null, suppressMoveUntil=0, mapLoadSeq=0;
 
 function initMap(){
   leafletMap = L.map('leaflet-map',{worldCopyJump:true,crs:L.CRS.EPSG3857}).setView([25,10],2.3);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?api_key=cb1_30ao_1_68012df97029096588c6bcf6',{
-    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains:'abcd', maxZoom:20
-  }).addTo(leafletMap);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(leafletMap);
   leafletMap.on('moveend zoomend',onMapMoved);
   if(isTouchDevice) leafletMap.on('dragstart click',()=>toggleMapSheet(false));
   setTimeout(()=>leafletMap.invalidateSize(),50);
