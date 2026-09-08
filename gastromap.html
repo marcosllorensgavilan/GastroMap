@@ -2782,7 +2782,7 @@ function buildListing(places,text){
     else { filteredNote=' (ninguno etiquetado exactamente como lo pedido — son los mejores disponibles en la zona igualmente, coméntalo si recomiendas alguno)'; }
   }
   const top=pool.slice(0,20).map(p=>`- ${p.name} (${fmtCuisine(p.tags)||cap(p.tags.amenity)}, ★${p.score}${p.tags['addr:street']?', '+p.tags['addr:street']:''})`).join('\n');
-  return top+filteredNote;
+  return {text:top+filteredNote, pool};
 }
 async function findLocationContext(text){
   const candidates=extractLocationCandidates(text);
@@ -2791,7 +2791,8 @@ async function findLocationContext(text){
       const {places}=await fetchOSMCity(place);
       if(places.length){
         botLastLocation=place;
-        return {place, listing:buildListing(places,text), places};
+        const {text:listing,pool}=buildListing(places,text);
+        return {place, listing, places:pool};
       }
     }catch(e){/* prueba el siguiente candidato */}
   }
@@ -2802,7 +2803,8 @@ async function findLocationContext(text){
     try{
       const {places}=await fetchOSMCity(botLastLocation);
       if(places.length){
-        return {place:botLastLocation, listing:buildListing(places,text), places};
+        const {text:listing,pool}=buildListing(places,text);
+        return {place:botLastLocation, listing, places:pool};
       }
     }catch(e){/* seguimos sin contexto */}
   }
