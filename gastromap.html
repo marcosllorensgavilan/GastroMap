@@ -666,8 +666,8 @@ a{text-decoration:none;color:inherit}
     <video autoplay muted loop playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0">
       <source src="https://d8j0ntlcm91z4.cloudfront.net/user_3FKzKRSMzXjPCaxTwwAi0fbWZtW/hf_20260907_225137_eecf1ac6-a4cd-44fc-99ce-80896db085ff.mp4" type="video/mp4">
     </video>
-    <h1 style="-webkit-text-stroke:2px var(--bg);paint-order:stroke fill;text-shadow:0 0 14px var(--bg),0 0 28px var(--bg),0 2px 6px rgba(0,0,0,0.1)">Descubre los <em>mejores</em><br>restaurantes</h1>
-    <p style="-webkit-text-stroke:1.5px var(--bg);paint-order:stroke fill;text-shadow:0 0 10px var(--bg),0 0 20px var(--bg)">Ranking inteligente con datos reales, críticos verificados y comunidad gastronómica</p>
+    <h1 style="-webkit-text-stroke:1.5px var(--bg);paint-order:stroke fill;text-shadow:0 1px 4px rgba(0,0,0,0.08)">Descubre los <em>mejores</em><br>restaurantes</h1>
+    <p style="-webkit-text-stroke:1px var(--bg);paint-order:stroke fill">Ranking inteligente con datos reales, críticos verificados y comunidad gastronómica</p>
     <div class="search-box">
       <input id="hero-search" placeholder="Busca una ciudad… Valencia, Tokyo, Miami…" onkeydown="if(event.key==='Enter')heroSearch()">
       <div class="search-suggest-dropdown" id="hero-search-suggest"></div>
@@ -1064,6 +1064,20 @@ a{text-decoration:none;color:inherit}
       </div>
     </div>
 
+    <div class="rep-card" style="margin-bottom:16px">
+      <div class="rep-header">📍 Ubicación</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <div>
+          <div style="font-size:14px;font-weight:600">Centrar el Mapa en mi ubicación</div>
+          <div style="font-size:12px;color:var(--textl)">Al desactivarlo, el Mapa ya no te pedirá permiso de ubicación cada vez que lo abras</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
+          <input type="checkbox" id="ajustes-location-toggle" onchange="toggleAutoLocation(this.checked)" style="opacity:0;width:0;height:0">
+          <span id="ajustes-location-slider" style="position:absolute;inset:0;background:var(--g3);border-radius:24px;transition:0.2s;cursor:pointer"></span>
+        </label>
+      </div>
+    </div>
+
     <div class="rep-card" id="ajustes-cuenta-card">
       <div class="rep-header">🔐 <span data-i18n="ajustes_cuenta">Cuenta</span></div>
       <div style="display:flex;flex-direction:column;gap:10px">
@@ -1078,36 +1092,65 @@ a{text-decoration:none;color:inherit}
 
 <!-- ═══════════════════════════════ PERFIL ═══════════════════════════════ -->
 <div id="page-perfil" class="page">
-  <div class="profile-hero">
-    <div class="profile-ava" id="pfl-avatar" onclick="document.getElementById('pfl-avatar-input').click()" style="cursor:pointer;position:relative;background-size:cover;background-position:center">
+  <div class="profile-hero" style="display:flex;align-items:flex-start;gap:18px;text-align:left;padding:28px 24px 20px">
+    <div class="profile-ava" id="pfl-avatar" onclick="document.getElementById('pfl-avatar-input').click()" style="cursor:pointer;position:relative;background-size:cover;background-position:center;margin:0;flex-shrink:0">
       <span id="pfl-avatar-letter">?</span>
       <div style="position:absolute;bottom:-2px;right:-2px;background:var(--orange);color:white;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;border:2px solid var(--bg)">📷</div>
     </div>
     <input type="file" id="pfl-avatar-input" accept="image/*" style="display:none" onchange="uploadMyAvatar(this.files[0])">
-    <div class="profile-name" id="pfl-name">Sin iniciar sesión</div>
-    <div class="profile-email" id="pfl-email">Ve a Ajustes para crear tu cuenta</div>
-    <div id="pfl-bio" onclick="editMyBio()" style="font-size:13px;color:var(--textm);margin-bottom:10px;cursor:pointer;max-width:360px;margin-left:auto;margin-right:auto"></div>
-    <div class="profile-level-badge" id="pfl-level-badge">⭐ Foodie</div>
-    <div class="profile-stats-row">
-      <div class="pstat"><div class="pstat-num" id="pstat-resenas">49</div><div class="pstat-lbl">Reseñas</div></div>
-      <div class="pstat"><div class="pstat-num" id="pstat-favs">0</div><div class="pstat-lbl">Favoritos</div></div>
-      <div class="pstat"><div class="pstat-num" id="pstat-puntos">0</div><div class="pstat-lbl">Puntos</div></div>
-      <div class="pstat" style="cursor:pointer" onclick="openFollowList(currentUser&&currentUser.id,'followers')"><div class="pstat-num" id="pstat-followers">0</div><div class="pstat-lbl">Seguidores</div></div>
-      <div class="pstat" style="cursor:pointer" onclick="openFollowList(currentUser&&currentUser.id,'following')"><div class="pstat-num" id="pstat-following">0</div><div class="pstat-lbl">Siguiendo</div></div>
+    <div style="flex:1;padding-top:2px">
+      <div class="profile-name" id="pfl-name" style="margin-bottom:2px">Sin iniciar sesión</div>
+      <div class="profile-email" id="pfl-email" style="margin-bottom:6px">Ve a Ajustes para crear tu cuenta</div>
+      <div id="pfl-bio" onclick="editMyBio()" style="font-size:13px;color:var(--textm);margin-bottom:10px;cursor:pointer"></div>
+      <div class="profile-level-badge" id="pfl-level-badge" style="margin-bottom:12px">⭐ Foodie</div>
+      <div class="profile-stats-row" style="justify-content:flex-start;gap:24px;margin-top:0">
+        <div class="pstat" style="cursor:pointer" onclick="openFollowList(currentUser&&currentUser.id,'followers')"><div class="pstat-num" id="pstat-followers">0</div><div class="pstat-lbl">Seguidores</div></div>
+        <div class="pstat" style="cursor:pointer" onclick="openFollowList(currentUser&&currentUser.id,'following')"><div class="pstat-num" id="pstat-following">0</div><div class="pstat-lbl">Siguiendo</div></div>
+        <div class="pstat"><div class="pstat-num" id="pstat-puntos">0</div><div class="pstat-lbl">Puntos</div></div>
+      </div>
+      <!-- Se mantienen ocultos para no romper el código que ya los actualiza (reseñas/favoritos), simplemente ya no se muestran en la cabecera -->
+      <div style="display:none"><span id="pstat-resenas">49</span><span id="pstat-favs">0</span></div>
     </div>
   </div>
   <div class="profile-nav">
-    <button class="profile-nav-item active" onclick="profileTab(this,'rep')">Reputación</button>
-    <button class="profile-nav-item" onclick="profileTab(this,'misresenas')">Mis Reseñas</button>
-    <button class="profile-nav-item" onclick="profileTab(this,'foodprint')">Foodprint</button>
-    <button class="profile-nav-item" onclick="profileTab(this,'favs')">Favoritos</button>
-    <button class="profile-nav-item" onclick="profileTab(this,'listas')">Mis Listas</button>
-    <button class="profile-nav-item" onclick="profileTab(this,'videos')">Vídeos</button>
-    <button class="profile-nav-item" onclick="profileTab(this,'niveles')">Niveles</button>
+    <button class="profile-nav-item active" onclick="profileTab(this,'videos')">🎬 Vídeos</button>
+    <button class="profile-nav-item" onclick="profileTab(this,'misresenas')">⭐ Reseñas</button>
+    <button class="profile-nav-item" onclick="profileTab(this,'guardado')">🔖 Guardado</button>
+    <button class="profile-nav-item" onclick="profileTab(this,'actividad')">📊 Actividad</button>
   </div>
   <div class="profile-body">
-    <div id="profile-tab-rep">
-      <div class="rep-card">
+    <div id="profile-tab-videos">
+      <input type="file" id="my-video-input" accept="video/*" style="display:none" onchange="uploadMyVideo(this.files[0])">
+      <button class="btn-ia" style="width:auto;padding:12px 22px;margin-bottom:16px" onclick="document.getElementById('my-video-input').click()">🎬 Subir vídeo</button>
+      <div id="my-videos-grid" style="max-width:360px"></div>
+    </div>
+    <div id="profile-tab-misresenas" style="display:none">
+      <div id="mis-resenas-list"></div>
+    </div>
+    <div id="profile-tab-guardado" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="profile-nav-item active" id="guardado-subtab-favs" onclick="switchGuardadoSubtab('favs')" style="flex:1;text-align:center">Favoritos</button>
+        <button class="profile-nav-item" id="guardado-subtab-listas" onclick="switchGuardadoSubtab('listas')" style="flex:1;text-align:center">Mis Listas</button>
+      </div>
+      <div id="guardado-favs">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+          <input id="favs-search" type="text" placeholder="Buscar por nombre…" oninput="renderFavs()"
+            style="flex:1;min-width:180px;padding:10px 14px;border:1px solid var(--g2);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif">
+          <select id="favs-cuisine-filter" onchange="renderFavs()" style="padding:10px 12px;border:1px solid var(--g2);border-radius:10px;font-size:13px;font-family:'Inter',sans-serif;background:var(--white)">
+            <option value="">Todas las cocinas</option>
+          </select>
+          <select id="favs-location-filter" onchange="renderFavs()" style="padding:10px 12px;border:1px solid var(--g2);border-radius:10px;font-size:13px;font-family:'Inter',sans-serif;background:var(--white)">
+            <option value="">Todas las ubicaciones</option>
+          </select>
+        </div>
+        <div id="favs-list"></div>
+      </div>
+      <div id="guardado-listas" style="display:none">
+        <div id="mis-listas-list"></div>
+      </div>
+    </div>
+    <div id="profile-tab-actividad" style="display:none">
+      <div class="rep-card" style="margin-bottom:16px">
         <div class="rep-header">🏆 Sistema de Reputación</div>
         <div class="rep-progress">
           <span id="rep-level-name">Foodie</span><span id="rep-level-pts">0 puntos</span>
@@ -1121,36 +1164,7 @@ a{text-decoration:none;color:inherit}
         <div class="earn-item">📝 Publicar reseña: <strong style="margin-left:4px">+10 pts</strong></div>
         <div class="earn-item"><svg width="15" height="15" viewBox="0 0 24 24" style="vertical-align:-3px"><defs><linearGradient id="ghstatic" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F3CE7E"/><stop offset="100%" stop-color="#D08A2E"/></linearGradient></defs><path d="M12,21.35l-1.45-1.32C5.4,15.36,2,12.28,2,8.5 2,5.42,4.42,3,7.5,3c1.74,0,3.41,0.81,4.5,2.09C13.09,3.81,14.76,3,16.5,3 19.58,3,22,5.42,22,8.5c0,3.78-3.4,6.86-8.55,11.54L12,21.35z" fill="url(#ghstatic)"/></svg> Guardar favorito: <strong style="margin-left:4px">+2 pts</strong></div>
       </div>
-    </div>
-    <div id="profile-tab-misresenas" style="display:none">
-      <div id="mis-resenas-list"></div>
-    </div>
-    <div id="profile-tab-foodprint" style="display:none">
-      <div id="foodprint-body"></div>
-    </div>
-    <div id="profile-tab-favs" style="display:none">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-        <input id="favs-search" type="text" placeholder="Buscar por nombre…" oninput="renderFavs()"
-          style="flex:1;min-width:180px;padding:10px 14px;border:1px solid var(--g2);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif">
-        <select id="favs-cuisine-filter" onchange="renderFavs()" style="padding:10px 12px;border:1px solid var(--g2);border-radius:10px;font-size:13px;font-family:'Inter',sans-serif;background:var(--white)">
-          <option value="">Todas las cocinas</option>
-        </select>
-        <select id="favs-location-filter" onchange="renderFavs()" style="padding:10px 12px;border:1px solid var(--g2);border-radius:10px;font-size:13px;font-family:'Inter',sans-serif;background:var(--white)">
-          <option value="">Todas las ubicaciones</option>
-        </select>
-      </div>
-      <div id="favs-list"></div>
-    </div>
-    <div id="profile-tab-listas" style="display:none">
-      <div id="mis-listas-list"></div>
-    </div>
-    <div id="profile-tab-videos" style="display:none">
-      <input type="file" id="my-video-input" accept="video/*" style="display:none" onchange="uploadMyVideo(this.files[0])">
-      <button class="btn-ia" style="width:auto;padding:12px 22px;margin-bottom:16px" onclick="document.getElementById('my-video-input').click()">🎬 Subir vídeo</button>
-      <div id="my-videos-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px"></div>
-    </div>
-    <div id="profile-tab-niveles" style="display:none">
-      <div class="rep-card">
+      <div class="rep-card" style="margin-bottom:16px">
         <div class="rep-header">⭐ Niveles</div>
         <div class="level-list">
           <div class="level-row" id="level-row-0"><div class="level-icon">⭐</div><div class="level-name">Foodie</div><div class="level-pts">0+ puntos</div><div class="current-badge" id="level-badge-0" style="display:none">Actual</div></div>
@@ -1158,6 +1172,10 @@ a{text-decoration:none;color:inherit}
           <div class="level-row" id="level-row-2"><div class="level-icon">🌐</div><div class="level-name">Experto Local</div><div class="level-pts">200+ puntos</div><div class="current-badge" id="level-badge-2" style="display:none">Actual</div></div>
           <div class="level-row" id="level-row-3"><div class="level-icon">🛡</div><div class="level-name">Crítico Verificado</div><div class="level-pts">500+ puntos</div><div class="current-badge" id="level-badge-3" style="display:none">Actual</div></div>
         </div>
+      </div>
+      <div class="rep-card">
+        <div class="rep-header">👣 Foodprint</div>
+        <div id="foodprint-body"></div>
       </div>
     </div>
   </div>
@@ -1671,17 +1689,21 @@ function initMap(){
   leafletMap.on('moveend zoomend',onMapMoved);
   if(isTouchDevice) leafletMap.on('dragstart click',()=>toggleMapSheet(false));
   setTimeout(()=>leafletMap.invalidateSize(),50);
-  // Como Google Maps o Apple Maps: si el navegador nos deja, abrimos ya
-  // centrados en la ubicación real de la persona, en vez de enseñar el
-  // mapamundi entero de entrada. Si no da permiso o falla, nos quedamos con
-  // la vista del mundo de siempre — no se rompe nada.
-  getCurrentLocation().then(loc=>{
-    suppressMoveUntil=Date.now()+1200;
-    leafletMap.setView([loc.lat,loc.lon],14,{animate:false});
+  // Como Google Maps o Apple Maps: si el navegador nos deja Y la persona lo
+  // ha permitido en Ajustes, abrimos ya centrados en su ubicación real. Si
+  // ha desactivado esto (para no ver el aviso del navegador cada vez), nos
+  // quedamos directamente con la vista del mundo, sin pedir nada.
+  if(localStorage.getItem('gm_auto_location')!=='off'){
+    getCurrentLocation().then(loc=>{
+      suppressMoveUntil=Date.now()+1200;
+      leafletMap.setView([loc.lat,loc.lon],14,{animate:false});
+      loadMapArea();
+    }).catch(()=>{
+      loadMapArea();
+    });
+  }else{
     loadMapArea();
-  }).catch(()=>{
-    loadMapArea();
-  });
+  }
 }
 // Estos tres ayudantes se dejan con el mismo nombre que antes (para no tener
 // que tocar todos los sitios que ya los llaman), pero ahora usan la API de
@@ -2443,6 +2465,7 @@ function renderExplorarStyleGrid(places, container){
   }).join('')+'</div>';
 }
 function toggleSaveList(index){
+  if(!currentUser){ showLoginPrompt('Inicia sesión o regístrate para guardar listas.'); return; }
   const i = savedListsIdx.indexOf(index);
   if(i>=0) savedListsIdx.splice(i,1);
   else savedListsIdx.push(index);
@@ -2840,10 +2863,14 @@ async function editMyBio(){
 }
 async function uploadMyVideo(file){
   if(!file||!currentUser) return;
+  const caption=prompt('Escribe un pie de foto para este vídeo (opcional):','')||'';
+  const location=prompt('¿Dónde se grabó? (opcional):','')||'';
   const grid=document.getElementById('my-videos-grid');
   grid.insertAdjacentHTML('afterbegin','<div class="inline-loading"><div class="spinner"></div> Subiendo vídeo…</div>');
   const fd=new FormData();
   fd.append('video',file);
+  fd.append('caption',caption);
+  fd.append('location',location);
   try{
     const resp=await fetch(`${LOCAL_DB_URL}/api/upload/video`,{method:'POST',headers:{'Authorization':'Bearer '+authToken},body:fd});
     const data=await resp.json();
@@ -2851,19 +2878,80 @@ async function uploadMyVideo(file){
     renderMyVideos();
   }catch(e){ alert(e.message); renderMyVideos(); }
 }
+// Tarjeta de vídeo con pie de foto, ubicación, "me gusta" y comentarios
+// reales — se usa tanto en tu propio perfil como en el perfil público de
+// cualquier otra persona.
+function renderVideoCard(v,allowDelete){
+  const commentsId='vcomments-'+v.id;
+  return `<div style="background:var(--white);border:1px solid var(--g2);border-radius:12px;overflow:hidden;margin-bottom:14px">
+    <div style="position:relative">
+      <video src="${LOCAL_DB_URL}${v.video_url}" controls style="width:100%;display:block;background:#000;aspect-ratio:9/16;object-fit:cover;max-height:420px"></video>
+      ${allowDelete?`<button onclick="deleteMyVideo(${v.id})" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer">🗑</button>`:''}
+    </div>
+    <div style="padding:12px 14px">
+      ${v.caption?`<div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:8px">${v.caption}</div>`:''}
+      <div style="display:flex;gap:16px;font-size:12.5px;color:var(--textl);align-items:center">
+        <span onclick="toggleVideoLike(${v.id},this)" data-liked="${v.isLiked?'1':'0'}" style="cursor:pointer;display:flex;align-items:center;gap:4px">${heartSVG(!!v.isLiked,14)} <span class="vlike-count">${v.likeCount||0}</span></span>
+        <span onclick="toggleVideoComments(${v.id})" style="cursor:pointer">💬 ${v.commentCount||0}</span>
+        ${v.location?`<span>📍 ${v.location}</span>`:''}
+      </div>
+      <div id="${commentsId}" style="display:none;margin-top:10px;border-top:1px solid var(--g1);padding-top:10px"></div>
+    </div>
+  </div>`;
+}
+async function toggleVideoLike(videoId,el){
+  if(!currentUser){ showLoginPrompt('Inicia sesión para dar "me gusta".'); return; }
+  const liked=el.getAttribute('data-liked')==='1';
+  const countEl=el.querySelector('.vlike-count');
+  try{
+    await fetch(`${LOCAL_DB_URL}/api/videos/${videoId}/like`,{method:liked?'DELETE':'POST',headers:{'Authorization':'Bearer '+authToken}});
+    el.setAttribute('data-liked',liked?'0':'1');
+    el.innerHTML=`${heartSVG(!liked,14)} <span class="vlike-count">${Math.max(0,(parseInt(countEl.textContent,10)||0)+(liked?-1:1))}</span>`;
+  }catch(e){ alert('No se pudo actualizar. Inténtalo de nuevo.'); }
+}
+async function toggleVideoComments(videoId){
+  const box=document.getElementById('vcomments-'+videoId);
+  if(!box) return;
+  if(box.style.display==='block'){ box.style.display='none'; return; }
+  box.style.display='block';
+  box.innerHTML='<div class="inline-loading"><div class="spinner"></div> Cargando comentarios…</div>';
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/videos/${videoId}/comments`);
+    const data=await resp.json();
+    const comments=data.comments||[];
+    const list=comments.length?comments.map(c=>`
+      <div style="margin-bottom:8px;font-size:12.5px">
+        <strong style="cursor:pointer" onclick="openPublicProfile(${c.user_id})">${c.user_name}</strong>
+        <span style="color:var(--textm)">${c.text}</span>
+      </div>`).join(''):'<div style="font-size:12.5px;color:var(--textl);margin-bottom:8px">Sé el primero en comentar.</div>';
+    const inputHtml=currentUser?`<div style="display:flex;gap:6px;margin-top:6px">
+      <input type="text" id="vcomment-input-${videoId}" placeholder="Escribe un comentario…" style="flex:1;padding:7px 10px;border:1px solid var(--g2);border-radius:8px;font-size:12.5px;font-family:'Inter',sans-serif" onkeydown="if(event.key==='Enter')postVideoComment(${videoId})">
+      <button onclick="postVideoComment(${videoId})" style="background:var(--orange);color:white;border:none;border-radius:8px;padding:0 12px;font-size:12.5px;cursor:pointer">Enviar</button>
+    </div>`:'';
+    box.innerHTML=list+inputHtml;
+  }catch(e){ box.innerHTML='<div style="font-size:12.5px;color:var(--textl)">No se pudieron cargar los comentarios.</div>'; }
+}
+async function postVideoComment(videoId){
+  if(!currentUser){ showLoginPrompt('Inicia sesión para comentar.'); return; }
+  const input=document.getElementById('vcomment-input-'+videoId);
+  const text=input.value.trim();
+  if(!text) return;
+  try{
+    await fetch(`${LOCAL_DB_URL}/api/videos/${videoId}/comments`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({text})});
+    input.value='';
+    document.getElementById('vcomments-'+videoId).style.display='none';
+    toggleVideoComments(videoId);
+  }catch(e){ alert('No se pudo publicar el comentario.'); }
+}
 async function renderMyVideos(){
   const grid=document.getElementById('my-videos-grid');
   if(!currentUser){ grid.innerHTML=''; return; }
   try{
-    const resp=await fetch(`${LOCAL_DB_URL}/api/users/${currentUser.id}/public`);
+    const resp=await fetch(`${LOCAL_DB_URL}/api/users/${currentUser.id}/public`,{headers:{'Authorization':'Bearer '+authToken}});
     const data=await resp.json();
     const videos=data.videos||[];
-    if(!videos.length){ grid.innerHTML='<div class="favs-empty" style="grid-column:1/-1"><div class="favs-empty-icon">🎬</div><div class="empty-title">Sin vídeos aún</div><div class="empty-sub">Sube tu primer vídeo con el botón de arriba.</div></div>'; return; }
-    grid.innerHTML=videos.map(v=>`
-      <div style="position:relative">
-        <video src="${LOCAL_DB_URL}${v.video_url}" controls style="width:100%;border-radius:10px;display:block;background:#000;aspect-ratio:9/16;object-fit:cover"></video>
-        <button onclick="deleteMyVideo(${v.id})" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer">🗑</button>
-      </div>`).join('');
+    if(!videos.length){ grid.innerHTML='<div class="favs-empty"><div class="favs-empty-icon">🎬</div><div class="empty-title">Sin vídeos aún</div><div class="empty-sub">Sube tu primer vídeo con el botón de arriba.</div></div>'; return; }
+    grid.innerHTML=videos.map(v=>renderVideoCard(v,true)).join('');
   }catch(e){ grid.innerHTML='<div class="ia-prose">No se pudieron cargar tus vídeos.</div>'; }
 }
 async function deleteMyVideo(id){
@@ -2897,7 +2985,7 @@ async function openPublicProfile(userId){
     const avaHtml=u.avatar_url?`<div style="width:72px;height:72px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${u.avatar_url}');background-size:cover;background-position:center;margin:0 auto 12px;border:3px solid var(--g2)"></div>`
       :`<div class="profile-ava" style="margin:0 auto 12px"><span>${u.name.charAt(0).toUpperCase()}</span></div>`;
     const followBtn=currentUser?`<button class="btn-ia" id="pp-follow-btn" style="width:auto;padding:9px 22px;margin-top:10px" onclick="togglePublicFollow(${u.id})">${data.isFollowing?'✓ Siguiendo':'+ Seguir'}</button>`:'';
-    const videosHtml=(data.videos||[]).length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:10px">${data.videos.map(v=>`<video src="${LOCAL_DB_URL}${v.video_url}" controls style="width:100%;border-radius:10px;display:block;background:#000;aspect-ratio:9/16;object-fit:cover"></video>`).join('')}</div>`:'<div style="font-size:13px;color:var(--textl)">Sin vídeos todavía.</div>';
+    const videosHtml=(data.videos||[]).length?`<div style="max-width:360px;margin-top:10px">${data.videos.map(v=>renderVideoCard(v,false)).join('')}</div>`:'<div style="font-size:13px;color:var(--textl)">Sin vídeos todavía.</div>';
     const recsHtml=(data.reviews||[]).length?data.reviews.map(r=>`
       <div class="review-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -3577,17 +3665,22 @@ function openCreatorRecommendation(i){
 // PERFIL
 // ═══════════════════════════════════════════════════════════
 function profileTab(btn,tab){
-  document.querySelectorAll('.profile-nav-item').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.profile-nav > .profile-nav-item').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['rep','misresenas','foodprint','favs','listas','videos','niveles'].forEach(t=>{
+  ['videos','misresenas','guardado','actividad'].forEach(t=>{
     const el=document.getElementById('profile-tab-'+t);
     if(el) el.style.display=t===tab?'block':'none';
   });
-  if(tab==='favs') renderFavs();
-  if(tab==='foodprint') renderFoodprint();
   if(tab==='misresenas') renderMyReviews();
-  if(tab==='listas') renderMisListas();
+  if(tab==='guardado'){ renderFavs(); renderMisListas(); }
+  if(tab==='actividad'){ renderFoodprint(); }
   if(tab==='videos') renderMyVideos();
+}
+function switchGuardadoSubtab(sub){
+  document.getElementById('guardado-subtab-favs').classList.toggle('active',sub==='favs');
+  document.getElementById('guardado-subtab-listas').classList.toggle('active',sub==='listas');
+  document.getElementById('guardado-favs').style.display=sub==='favs'?'block':'none';
+  document.getElementById('guardado-listas').style.display=sub==='listas'?'block':'none';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3676,7 +3769,7 @@ function exploreFoodprintSuggestion(term){
   document.getElementById('hero-search').value=term;
   heroSearch();
 }
-function renderPerfil(){updateFavCount();}
+function renderPerfil(){updateFavCount();renderMyVideos();}
 
 // ═══════════════════════════════════════════════════════════
 // AJUSTES
@@ -3761,6 +3854,24 @@ function loadDarkModePref(){
   if(toggle) toggle.checked=on;
   updateDarkSliderVisual(on);
 }
+function toggleAutoLocation(on){
+  localStorage.setItem('gm_auto_location',on?'on':'off');
+  updateLocationSliderVisual(on);
+}
+function updateLocationSliderVisual(on){
+  const slider=document.getElementById('ajustes-location-slider');
+  if(!slider) return;
+  slider.style.background=on?'var(--orange)':'var(--g3)';
+  slider.innerHTML=`<span style="position:absolute;height:18px;width:18px;left:${on?'23px':'3px'};bottom:3px;background:white;border-radius:50%;transition:0.2s"></span>`;
+}
+function loadAutoLocationPref(){
+  // Activado por defecto (así el Mapa se abre en tu zona la primera vez),
+  // salvo que la persona lo haya desactivado explícitamente antes.
+  const on=localStorage.getItem('gm_auto_location')!=='off';
+  const toggle=document.getElementById('ajustes-location-toggle');
+  if(toggle) toggle.checked=on;
+  updateLocationSliderVisual(on);
+}
 
 // --- Borrar datos ---
 async function clearMyData(){
@@ -3790,6 +3901,7 @@ renderGlobalTop();
 loadCurrentUser();
 loadDefaultAllergiesIntoAjustes();
 loadDarkModePref();
+loadAutoLocationPref();
 applyTranslations();
 attachSearchSuggestions('hero-search',{runSearch:heroSearch,includeFood:false});
 attachSearchSuggestions('map-city-input',{runSearch:mapSearch,includeFood:true});

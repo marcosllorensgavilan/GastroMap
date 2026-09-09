@@ -102,6 +102,20 @@ appDb.exec(`
     user_id INTEGER NOT NULL,
     video_url TEXT NOT NULL,
     caption TEXT,
+    location TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS video_likes (
+    video_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (video_id, user_id)
+  );
+  CREATE TABLE IF NOT EXISTS video_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
 `);
@@ -307,10 +321,36 @@ app.post('/api/upload/video', requireAuth, (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo.' });
     const url = `/uploads/videos/${req.file.filename}`;
     const caption = String(req.body?.caption || '').slice(0, 280);
-    const info = appDb.prepare('INSERT INTO user_videos (user_id, video_url, caption, created_at) VALUES (?,?,?,?)')
-      .run(req.user.id, url, caption, new Date().toISOString());
-    res.json({ ok: true, id: info.lastInsertRowid, video_url: url, caption });
+    const location = String(req.body?.location || '').slice(0, 120);
+    const info = appDb.prepare('INSERT INTO user_videos (user_id, video_url, caption, location, created_at) VALUES (?,?,?,?,?)')
+      .run(req.user.id, url, caption, location, new Date().toISOString());
+    res.json({ ok: true, id: info.lastInsertRowid, video_url: url, caption, location });
   });
+});
+
+app.post('/api/videos/:id/like', requireAuth, (req, res) => {
+  appDb.prepare('INSERT OR IGNORE INTO video_likes (video_id, user_id, created_at) VALUES (?,?,?)')
+    .run(req.params.id, req.user.id, new Date().toISOString());
+  res.json({ ok: true });
+});
+app.delete('/api/videos/:id/like', requireAuth, (req, res) => {
+  appDb.prepare('DELETE FROM video_likes WHERE video_id = ? AND user_id = ?').run(req.params.id, req.user.id);
+  res.json({ ok: true });
+});
+app.get('/api/videos/:id/comments', (req, res) => {
+  const rows = appDb.prepare(`
+    SELECT video_comments.id, video_comments.text, video_comments.created_at, users.id as user_id, users.name as user_name, users.avatar_url as user_avatar
+    FROM video_comments JOIN users ON users.id = video_comments.user_id
+    WHERE video_id = ? ORDER BY video_comments.created_at ASC
+  `).all(req.params.id);
+  res.json({ comments: rows });
+});
+app.post('/api/videos/:id/comments', requireAuth, (req, res) => {
+  const text = String(req.body?.text || '').trim().slice(0, 500);
+  if (!text) return res.status(400).json({ error: 'El comentario no puede estar vacío.' });
+  const info = appDb.prepare('INSERT INTO video_comments (video_id, user_id, text, created_at) VALUES (?,?,?,?)')
+    .run(req.params.id, req.user.id, text, new Date().toISOString());
+  res.json({ ok: true, id: info.lastInsertRowid });
 });
 
 app.delete('/api/videos/:id', requireAuth, (req, res) => {
@@ -350,7 +390,13 @@ app.get('/api/users/:id/public', (req, res) => {
     isFollowing = !!appDb.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?').get(req.user.id, id);
   }
   const reviews = appDb.prepare('SELECT id, restaurant_id, restaurant_name, rating, text, created_at FROM reviews WHERE user_id = ? ORDER BY created_at DESC').all(id);
-  const videos = appDb.prepare('SELECT id, video_url, caption, created_at FROM user_videos WHERE user_id = ? ORDER BY created_at DESC').all(id);
+  const videos = appDb.prepare('SELECT id, video_url, caption, location, created_at FROM user_videos WHERE user_id = ? ORDER BY created_at DESC').all(id)
+    .map(v => {
+      const likeCount = appDb.prepare('SELECT COUNT(*) c FROM video_likes WHERE video_id = ?').get(v.id).c;
+      const commentCount = appDb.prepare('SELECT COUNT(*) c FROM video_comments WHERE video_id = ?').get(v.id).c;
+      const isLiked = req.user ? !!appDb.prepare('SELECT 1 FROM video_likes WHERE video_id = ? AND user_id = ?').get(v.id, req.user.id) : false;
+      return { ...v, likeCount, commentCount, isLiked };
+    });
   res.json({ user, followerCount, followingCount, isFollowing, reviews, videos });
 });
 app.get('/api/users/:id/followers', (req, res) => {
