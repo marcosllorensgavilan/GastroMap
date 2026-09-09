@@ -1201,7 +1201,7 @@ a{text-decoration:none;color:inherit}
         <div style="font-size:15px;font-weight:700;color:var(--text)">Tus publicaciones</div>
         <button onclick="openVideoUploadModal()" title="Subir vídeo" style="background:var(--orange);color:white;border:none;width:34px;height:34px;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow2);flex-shrink:0">+</button>
       </div>
-      <div id="my-videos-grid" style="max-width:360px"></div>
+      <div id="my-videos-grid" style="max-width:640px;display:grid;grid-template-columns:repeat(2,1fr);gap:14px"></div>
     </div>
     <div id="profile-tab-misresenas" style="display:none">
       <div id="mis-resenas-list"></div>
@@ -3281,7 +3281,7 @@ async function openPublicProfile(userId){
     const avaHtml=u.avatar_url?`<div onclick="openImageLightbox('${LOCAL_DB_URL}${u.avatar_url}')" style="width:72px;height:72px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${u.avatar_url}');background-size:cover;background-position:center;margin:0 auto 12px;border:3px solid var(--g2);cursor:pointer"></div>`
       :`<div class="profile-ava" style="margin:0 auto 12px"><span>${u.name.charAt(0).toUpperCase()}</span></div>`;
     const followBtn=currentUser?`<button class="btn-ia" id="pp-follow-btn" style="width:auto;padding:9px 22px;margin-top:10px" onclick="togglePublicFollow(${u.id})">${data.isFollowing?'✓ Siguiendo':'+ Seguir'}</button>`:'';
-    const videosHtml=(data.videos||[]).length?`<div style="max-width:360px;margin-top:10px">${data.videos.map(v=>renderVideoCard(v,false)).join('')}</div>`:'<div style="font-size:13px;color:var(--textl)">Sin vídeos todavía.</div>';
+    const videosHtml=(data.videos||[]).length?`<div style="max-width:640px;margin-top:10px;display:grid;grid-template-columns:repeat(2,1fr);gap:14px">${data.videos.map(v=>renderVideoCard(v,false)).join('')}</div>`:'<div style="font-size:13px;color:var(--textl)">Sin vídeos todavía.</div>';
     const recsHtml=(data.reviews||[]).length?data.reviews.map(r=>`
       <div class="review-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
