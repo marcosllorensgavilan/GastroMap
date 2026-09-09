@@ -1011,6 +1011,14 @@ a{text-decoration:none;color:inherit}
   </div>
 </div>
 
+<!-- ═══════════════════════════════ DETALLE DE PUBLICACIÓN ═══════════════════════════════ -->
+<div id="video-detail-overlay" onclick="if(event.target===this)closeVideoDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:5500;align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:360px;width:100%;max-height:90vh;overflow-y:auto;position:relative">
+    <button onclick="closeVideoDetail()" style="position:absolute;top:-36px;right:0;background:none;border:none;color:white;font-size:28px;cursor:pointer;line-height:1">×</button>
+    <div id="video-detail-body"></div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════ RECORTAR FOTO DE PERFIL ═══════════════════════════════ -->
 <div id="avatar-crop-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:6500;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--white);border-radius:16px;max-width:360px;width:100%;box-shadow:var(--shadow2);overflow:hidden">
@@ -1052,7 +1060,7 @@ a{text-decoration:none;color:inherit}
 
 <!-- ═══════════════════════════════ NUEVA PUBLICACIÓN (VÍDEO) ═══════════════════════════════ -->
 <div id="video-upload-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:5000;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--white);border-radius:16px;max-width:400px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow2)">
+  <div style="background:var(--white);border-radius:16px;max-width:400px;width:100%;max-height:90vh;overflow:visible;box-shadow:var(--shadow2)">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--g2)">
       <button onclick="closeVideoUploadModal()" style="background:none;border:none;color:var(--textl);font-size:14px;cursor:pointer;padding:0">Cancelar</button>
       <div style="font-weight:700;font-size:14px">Nueva publicación</div>
@@ -1193,7 +1201,7 @@ a{text-decoration:none;color:inherit}
         <div style="font-size:15px;font-weight:700;color:var(--text)">Tus publicaciones</div>
         <button onclick="openVideoUploadModal()" title="Subir vídeo" style="background:var(--orange);color:white;border:none;width:34px;height:34px;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow2);flex-shrink:0">+</button>
       </div>
-      <div id="my-videos-grid" style="max-width:360px"></div>
+      <div id="my-videos-grid" style="max-width:500px"></div>
     </div>
     <div id="profile-tab-misresenas" style="display:none">
       <div id="mis-resenas-list"></div>
@@ -2967,6 +2975,7 @@ function uploadMyAvatar(file){
   avatarCrop.file=file;
   const img=document.getElementById('avatar-crop-img');
   const url=URL.createObjectURL(file);
+  document.getElementById('avatar-crop-overlay').style.display='flex'; // primero visible, para que el escenario tenga tamaño real al medirlo
   img.onload=()=>{
     avatarCrop.natW=img.naturalWidth;
     avatarCrop.natH=img.naturalHeight;
@@ -2980,7 +2989,6 @@ function uploadMyAvatar(file){
     document.getElementById('avatar-crop-zoom').max=avatarCrop.minScale*3;
     document.getElementById('avatar-crop-zoom').value=avatarCrop.minScale;
     applyAvatarCropTransform();
-    document.getElementById('avatar-crop-overlay').style.display='flex';
   };
   img.src=url;
 }
@@ -3146,6 +3154,28 @@ async function submitVideoUpload(){
 // Tarjeta de vídeo con pie de foto, ubicación, "me gusta" y comentarios
 // reales — se usa tanto en tu propio perfil como en el perfil público de
 // cualquier otra persona.
+// Miniatura cuadrada para la rejilla de 3 columnas (como Instagram) — al
+// tocarla se abre la tarjeta completa con pie de foto, "me gusta" y
+// comentarios, en vez de mostrar todo eso apilado verticalmente de golpe.
+let videoGridCache={};
+function renderVideoThumbGrid(videos,allowDelete){
+  videos.forEach(v=>videoGridCache[v.id]={...v,allowDelete});
+  return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">${videos.map(v=>`
+    <div onclick="openVideoDetail(${v.id})" style="position:relative;aspect-ratio:1/1;cursor:pointer;background:#000">
+      <video src="${LOCAL_DB_URL}${v.video_url}" muted style="width:100%;height:100%;object-fit:cover;display:block"></video>
+    </div>`).join('')}</div>`;
+}
+function openVideoDetail(id){
+  const v=videoGridCache[id];
+  if(!v) return;
+  const overlay=document.getElementById('video-detail-overlay');
+  document.getElementById('video-detail-body').innerHTML=renderVideoCard(v,v.allowDelete);
+  overlay.style.display='flex';
+}
+function closeVideoDetail(){
+  document.getElementById('video-detail-overlay').style.display='none';
+  document.getElementById('video-detail-body').innerHTML='';
+}
 function renderVideoCard(v,allowDelete){
   const commentsId='vcomments-'+v.id;
   return `<div style="background:var(--white);border:1px solid var(--g2);border-radius:12px;overflow:hidden;margin-bottom:14px">
@@ -3216,13 +3246,14 @@ async function renderMyVideos(){
     const data=await resp.json();
     const videos=data.videos||[];
     if(!videos.length){ grid.innerHTML='<div class="favs-empty"><div class="favs-empty-icon">🎬</div><div class="empty-title">Sin vídeos aún</div><div class="empty-sub">Sube tu primer vídeo con el botón de arriba.</div></div>'; return; }
-    grid.innerHTML=videos.map(v=>renderVideoCard(v,true)).join('');
+    grid.innerHTML=renderVideoThumbGrid(videos,true);
   }catch(e){ grid.innerHTML='<div class="ia-prose">No se pudieron cargar tus vídeos.</div>'; }
 }
 async function deleteMyVideo(id){
   if(!confirm('¿Borrar este vídeo?')) return;
   try{
     await fetch(`${LOCAL_DB_URL}/api/videos/${id}`,{method:'DELETE',headers:{'Authorization':'Bearer '+authToken}});
+    closeVideoDetail();
     renderMyVideos();
   }catch(e){ alert('No se pudo borrar el vídeo.'); }
 }
@@ -3250,7 +3281,7 @@ async function openPublicProfile(userId){
     const avaHtml=u.avatar_url?`<div onclick="openImageLightbox('${LOCAL_DB_URL}${u.avatar_url}')" style="width:72px;height:72px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${u.avatar_url}');background-size:cover;background-position:center;margin:0 auto 12px;border:3px solid var(--g2);cursor:pointer"></div>`
       :`<div class="profile-ava" style="margin:0 auto 12px"><span>${u.name.charAt(0).toUpperCase()}</span></div>`;
     const followBtn=currentUser?`<button class="btn-ia" id="pp-follow-btn" style="width:auto;padding:9px 22px;margin-top:10px" onclick="togglePublicFollow(${u.id})">${data.isFollowing?'✓ Siguiendo':'+ Seguir'}</button>`:'';
-    const videosHtml=(data.videos||[]).length?`<div style="max-width:360px;margin-top:10px">${data.videos.map(v=>renderVideoCard(v,false)).join('')}</div>`:'<div style="font-size:13px;color:var(--textl)">Sin vídeos todavía.</div>';
+    const videosHtml=(data.videos||[]).length?`<div style="max-width:400px;margin-top:10px">${renderVideoThumbGrid(data.videos,false)}</div>`:'<div style="font-size:13px;color:var(--textl)">Sin vídeos todavía.</div>';
     const recsHtml=(data.reviews||[]).length?data.reviews.map(r=>`
       <div class="review-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
