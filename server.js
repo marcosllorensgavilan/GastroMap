@@ -21,6 +21,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
 
 const DB_PATH = path.join(__dirname, 'restaurants.sqlite');
 const PORT = process.env.PORT || 3001;
@@ -90,8 +91,55 @@ appDb.exec(`
     text TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS follows (
+    follower_id INTEGER NOT NULL,
+    following_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (follower_id, following_id)
+  );
+  CREATE TABLE IF NOT EXISTS user_videos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    video_url TEXT NOT NULL,
+    caption TEXT,
+    created_at TEXT NOT NULL
+  );
 `);
+// Estas dos columnas se añadieron después del lanzamiento — ALTER TABLE con
+// comprobación, para que no falle en instalaciones que ya tenían la tabla
+// users creada de antes sin estas columnas.
+const userCols = appDb.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+if (!userCols.includes('avatar_url')) appDb.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT');
+if (!userCols.includes('bio')) appDb.exec('ALTER TABLE users ADD COLUMN bio TEXT');
 console.log(`💾 Base de datos de la app (usuarios/reseñas) en: ${APP_DB_PATH}`);
+
+// Carpeta para fotos de perfil y vídeos subidos por usuarios — dentro de
+// DATA_DIR, igual que app.sqlite, por la misma razón: sin disco persistente
+// en el hosting, esto se pierde en cada despliegue nuevo (ya avisado).
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
+const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars');
+const VIDEOS_DIR = path.join(UPLOADS_DIR, 'videos');
+[UPLOADS_DIR, AVATARS_DIR, VIDEOS_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+function makeUploader(dir, allowedMimePrefix, maxSizeMB) {
+  return multer({
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => cb(null, dir),
+      filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname) || '';
+        cb(null, crypto.randomBytes(16).toString('hex') + ext);
+      }
+    }),
+    limits: { fileSize: maxSizeMB * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      if (!file.mimetype.startsWith(allowedMimePrefix)) return cb(new Error(`Solo se permiten archivos de tipo ${allowedMimePrefix}*`));
+      cb(null, true);
+    }
+  });
+}
+const uploadAvatar = makeUploader(AVATARS_DIR, 'image/', 8);
+const uploadVideo = makeUploader(VIDEOS_DIR, 'video/', 100);
 
 function newToken() { return crypto.randomBytes(32).toString('hex'); }
 
@@ -102,7 +150,7 @@ function attachUser(req, res, next) {
   if (token) {
     const session = appDb.prepare('SELECT user_id FROM sessions WHERE token = ?').get(token);
     if (session) {
-      req.user = appDb.prepare('SELECT id, email, name FROM users WHERE id = ?').get(session.user_id) || null;
+      req.user = appDb.prepare('SELECT id, email, name, avatar_url, bio FROM users WHERE id = ?').get(session.user_id) || null;
     }
   }
   next();
@@ -197,7 +245,7 @@ app.get('/api/reviews', (req, res) => {
   const restaurantId = String(req.query.restaurant_id || '');
   if (!restaurantId) return res.status(400).json({ error: 'Falta restaurant_id.' });
   const rows = appDb.prepare(`
-    SELECT reviews.id, reviews.rating, reviews.text, reviews.created_at, users.name as user_name
+    SELECT reviews.id, reviews.rating, reviews.text, reviews.created_at, users.id as user_id, users.name as user_name, users.avatar_url as user_avatar
     FROM reviews JOIN users ON users.id = reviews.user_id
     WHERE restaurant_id = ?
     ORDER BY reviews.created_at DESC
@@ -232,6 +280,92 @@ app.get('/api/reviews/mine/list', requireAuth, (req, res) => {
 app.delete('/api/reviews/mine', requireAuth, (req, res) => {
   const info = appDb.prepare('DELETE FROM reviews WHERE user_id = ?').run(req.user.id);
   res.json({ ok: true, deleted: info.changes });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// FOTO DE PERFIL, BIO, VÍDEOS Y SEGUIDORES
+// ═══════════════════════════════════════════════════════════════
+app.post('/api/upload/avatar', requireAuth, (req, res) => {
+  uploadAvatar.single('avatar')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo.' });
+    const url = `/uploads/avatars/${req.file.filename}`;
+    appDb.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(url, req.user.id);
+    res.json({ ok: true, avatar_url: url });
+  });
+});
+
+app.put('/api/users/me/bio', requireAuth, (req, res) => {
+  const bio = String(req.body?.bio || '').slice(0, 280);
+  appDb.prepare('UPDATE users SET bio = ? WHERE id = ?').run(bio, req.user.id);
+  res.json({ ok: true, bio });
+});
+
+app.post('/api/upload/video', requireAuth, (req, res) => {
+  uploadVideo.single('video')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo.' });
+    const url = `/uploads/videos/${req.file.filename}`;
+    const caption = String(req.body?.caption || '').slice(0, 280);
+    const info = appDb.prepare('INSERT INTO user_videos (user_id, video_url, caption, created_at) VALUES (?,?,?,?)')
+      .run(req.user.id, url, caption, new Date().toISOString());
+    res.json({ ok: true, id: info.lastInsertRowid, video_url: url, caption });
+  });
+});
+
+app.delete('/api/videos/:id', requireAuth, (req, res) => {
+  const video = appDb.prepare('SELECT * FROM user_videos WHERE id = ?').get(req.params.id);
+  if (!video) return res.status(404).json({ error: 'Vídeo no encontrado.' });
+  if (video.user_id !== req.user.id) return res.status(403).json({ error: 'No puedes borrar el vídeo de otra persona.' });
+  appDb.prepare('DELETE FROM user_videos WHERE id = ?').run(req.params.id);
+  try { fs.unlinkSync(path.join(VIDEOS_DIR, path.basename(video.video_url))); } catch (e) {/* si el archivo ya no está, no pasa nada */}
+  res.json({ ok: true });
+});
+
+app.post('/api/follow/:userId', requireAuth, (req, res) => {
+  const targetId = parseInt(req.params.userId, 10);
+  if (targetId === req.user.id) return res.status(400).json({ error: 'No puedes seguirte a ti mismo.' });
+  const target = appDb.prepare('SELECT id FROM users WHERE id = ?').get(targetId);
+  if (!target) return res.status(404).json({ error: 'Usuario no encontrado.' });
+  appDb.prepare('INSERT OR IGNORE INTO follows (follower_id, following_id, created_at) VALUES (?,?,?)')
+    .run(req.user.id, targetId, new Date().toISOString());
+  res.json({ ok: true });
+});
+app.delete('/api/follow/:userId', requireAuth, (req, res) => {
+  appDb.prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?').run(req.user.id, req.params.userId);
+  res.json({ ok: true });
+});
+
+// Perfil público de cualquier usuario — nombre, foto, bio, seguidores,
+// vídeos, y sus reseñas a modo de "recomendaciones" (son lo mismo que las
+// reseñas privadas, solo que aquí se muestran para que cualquiera las vea).
+app.get('/api/users/:id/public', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const user = appDb.prepare('SELECT id, name, avatar_url, bio, created_at FROM users WHERE id = ?').get(id);
+  if (!user) return res.status(404).json({ error: 'Usuario no encontrado.' });
+  const followerCount = appDb.prepare('SELECT COUNT(*) c FROM follows WHERE following_id = ?').get(id).c;
+  const followingCount = appDb.prepare('SELECT COUNT(*) c FROM follows WHERE follower_id = ?').get(id).c;
+  let isFollowing = false;
+  if (req.user) {
+    isFollowing = !!appDb.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?').get(req.user.id, id);
+  }
+  const reviews = appDb.prepare('SELECT id, restaurant_id, restaurant_name, rating, text, created_at FROM reviews WHERE user_id = ? ORDER BY created_at DESC').all(id);
+  const videos = appDb.prepare('SELECT id, video_url, caption, created_at FROM user_videos WHERE user_id = ? ORDER BY created_at DESC').all(id);
+  res.json({ user, followerCount, followingCount, isFollowing, reviews, videos });
+});
+app.get('/api/users/:id/followers', (req, res) => {
+  const rows = appDb.prepare(`
+    SELECT u.id, u.name, u.avatar_url FROM follows f JOIN users u ON u.id = f.follower_id
+    WHERE f.following_id = ? ORDER BY f.created_at DESC
+  `).all(req.params.id);
+  res.json({ followers: rows });
+});
+app.get('/api/users/:id/following', (req, res) => {
+  const rows = appDb.prepare(`
+    SELECT u.id, u.name, u.avatar_url FROM follows f JOIN users u ON u.id = f.following_id
+    WHERE f.follower_id = ? ORDER BY f.created_at DESC
+  `).all(req.params.id);
+  res.json({ following: rows });
 });
 
 // Distancia de edición — cuántos cambios de letra hacen falta para pasar de

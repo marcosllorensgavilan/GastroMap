@@ -784,6 +784,14 @@ a{text-decoration:none;color:inherit}
   <div class="lists-grid" id="lists-grid"></div>
 </div>
 
+<!-- ═══════════════════════════════ PERFIL PÚBLICO ═══════════════════════════════ -->
+<div id="page-public-profile" class="page">
+  <div style="max-width:640px;margin:0 auto;padding:24px">
+    <button onclick="history.back()" style="background:none;border:none;color:var(--textl);font-size:13px;cursor:pointer;margin-bottom:16px;padding:0">← Volver</button>
+    <div id="pp-body"></div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════ DETALLE DE LISTA ═══════════════════════════════ -->
 <div id="page-list-detail" class="page">
   <div style="background:var(--bg);padding:24px;border-bottom:1px solid var(--g2)">
@@ -1071,14 +1079,21 @@ a{text-decoration:none;color:inherit}
 <!-- ═══════════════════════════════ PERFIL ═══════════════════════════════ -->
 <div id="page-perfil" class="page">
   <div class="profile-hero">
-    <div class="profile-ava" id="pfl-avatar">?</div>
+    <div class="profile-ava" id="pfl-avatar" onclick="document.getElementById('pfl-avatar-input').click()" style="cursor:pointer;position:relative;background-size:cover;background-position:center">
+      <span id="pfl-avatar-letter">?</span>
+      <div style="position:absolute;bottom:-2px;right:-2px;background:var(--orange);color:white;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;border:2px solid var(--bg)">📷</div>
+    </div>
+    <input type="file" id="pfl-avatar-input" accept="image/*" style="display:none" onchange="uploadMyAvatar(this.files[0])">
     <div class="profile-name" id="pfl-name">Sin iniciar sesión</div>
     <div class="profile-email" id="pfl-email">Ve a Ajustes para crear tu cuenta</div>
+    <div id="pfl-bio" onclick="editMyBio()" style="font-size:13px;color:var(--textm);margin-bottom:10px;cursor:pointer;max-width:360px;margin-left:auto;margin-right:auto"></div>
     <div class="profile-level-badge" id="pfl-level-badge">⭐ Foodie</div>
     <div class="profile-stats-row">
       <div class="pstat"><div class="pstat-num" id="pstat-resenas">49</div><div class="pstat-lbl">Reseñas</div></div>
       <div class="pstat"><div class="pstat-num" id="pstat-favs">0</div><div class="pstat-lbl">Favoritos</div></div>
       <div class="pstat"><div class="pstat-num" id="pstat-puntos">0</div><div class="pstat-lbl">Puntos</div></div>
+      <div class="pstat" style="cursor:pointer" onclick="openFollowList(currentUser&&currentUser.id,'followers')"><div class="pstat-num" id="pstat-followers">0</div><div class="pstat-lbl">Seguidores</div></div>
+      <div class="pstat" style="cursor:pointer" onclick="openFollowList(currentUser&&currentUser.id,'following')"><div class="pstat-num" id="pstat-following">0</div><div class="pstat-lbl">Siguiendo</div></div>
     </div>
   </div>
   <div class="profile-nav">
@@ -1087,6 +1102,7 @@ a{text-decoration:none;color:inherit}
     <button class="profile-nav-item" onclick="profileTab(this,'foodprint')">Foodprint</button>
     <button class="profile-nav-item" onclick="profileTab(this,'favs')">Favoritos</button>
     <button class="profile-nav-item" onclick="profileTab(this,'listas')">Mis Listas</button>
+    <button class="profile-nav-item" onclick="profileTab(this,'videos')">Vídeos</button>
     <button class="profile-nav-item" onclick="profileTab(this,'niveles')">Niveles</button>
   </div>
   <div class="profile-body">
@@ -1127,6 +1143,11 @@ a{text-decoration:none;color:inherit}
     </div>
     <div id="profile-tab-listas" style="display:none">
       <div id="mis-listas-list"></div>
+    </div>
+    <div id="profile-tab-videos" style="display:none">
+      <input type="file" id="my-video-input" accept="video/*" style="display:none" onchange="uploadMyVideo(this.files[0])">
+      <button class="btn-ia" style="width:auto;padding:12px 22px;margin-bottom:16px" onclick="document.getElementById('my-video-input').click()">🎬 Subir vídeo</button>
+      <div id="my-videos-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px"></div>
     </div>
     <div id="profile-tab-niveles" style="display:none">
       <div class="rep-card">
@@ -2689,7 +2710,7 @@ async function loadReviews(restaurantId){
     list.innerHTML=reviews.map(r=>`
       <div class="review-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <strong>${r.user_name}</strong>
+          <strong style="cursor:pointer" onclick="openPublicProfile(${r.user_id})">${r.user_avatar?`<img src="${r.user_avatar}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:-5px;margin-right:6px">`:''}${r.user_name}</strong>
           <span>${starRatingHTML(r.rating)}</span>
         </div>
         <div style="font-size:13px;color:var(--textm);line-height:1.5;margin-bottom:6px">${r.text}</div>
@@ -2762,6 +2783,7 @@ let authView='login'; // 'login' o 'register'
 function switchAuthView(view){ authView=view; renderAuthUI(); }
 function updateProfileHero(){
   const nameEl=document.getElementById('pfl-name'), emailEl=document.getElementById('pfl-email'), avaEl=document.getElementById('pfl-avatar');
+  const avaLetterEl=document.getElementById('pfl-avatar-letter'), bioEl=document.getElementById('pfl-bio');
   const navAvaEl=document.getElementById('nav-avatar');
   if(currentUser){
     if(navAvaEl) navAvaEl.textContent=currentUser.name.charAt(0).toUpperCase();
@@ -2772,13 +2794,153 @@ function updateProfileHero(){
   if(currentUser){
     nameEl.textContent=currentUser.name;
     emailEl.textContent=currentUser.email;
-    avaEl.textContent=currentUser.name.charAt(0).toUpperCase();
+    if(currentUser.avatar_url){
+      avaEl.style.backgroundImage=`url(${LOCAL_DB_URL}${currentUser.avatar_url})`;
+      avaLetterEl.style.display='none';
+    }else{
+      avaEl.style.backgroundImage='none';
+      avaLetterEl.style.display='block';
+      avaLetterEl.textContent=currentUser.name.charAt(0).toUpperCase();
+    }
+    bioEl.textContent=currentUser.bio||'Toca para añadir una bio…';
+    loadMyFollowCounts();
   }else{
     nameEl.textContent='Sin iniciar sesión';
     emailEl.textContent='Ve a Ajustes para crear tu cuenta';
-    avaEl.textContent='?';
+    avaEl.style.backgroundImage='none';
+    avaLetterEl.style.display='block';
+    avaLetterEl.textContent='?';
+    bioEl.textContent='';
   }
   refreshMyReviewCount();
+}
+async function uploadMyAvatar(file){
+  if(!file||!currentUser) return;
+  const fd=new FormData();
+  fd.append('avatar',file);
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/upload/avatar`,{method:'POST',headers:{'Authorization':'Bearer '+authToken},body:fd});
+    const data=await resp.json();
+    if(!resp.ok) throw new Error(data.error||'No se pudo subir la foto.');
+    currentUser.avatar_url=data.avatar_url;
+    updateProfileHero();
+  }catch(e){ alert(e.message); }
+}
+async function editMyBio(){
+  if(!currentUser) return;
+  const nueva=prompt('Cuéntanos algo sobre ti (máx. 280 caracteres):', currentUser.bio||'');
+  if(nueva===null) return;
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/users/me/bio`,{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({bio:nueva})});
+    const data=await resp.json();
+    if(!resp.ok) throw new Error(data.error||'No se pudo guardar la bio.');
+    currentUser.bio=data.bio;
+    updateProfileHero();
+  }catch(e){ alert(e.message); }
+}
+async function uploadMyVideo(file){
+  if(!file||!currentUser) return;
+  const grid=document.getElementById('my-videos-grid');
+  grid.insertAdjacentHTML('afterbegin','<div class="inline-loading"><div class="spinner"></div> Subiendo vídeo…</div>');
+  const fd=new FormData();
+  fd.append('video',file);
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/upload/video`,{method:'POST',headers:{'Authorization':'Bearer '+authToken},body:fd});
+    const data=await resp.json();
+    if(!resp.ok) throw new Error(data.error||'No se pudo subir el vídeo.');
+    renderMyVideos();
+  }catch(e){ alert(e.message); renderMyVideos(); }
+}
+async function renderMyVideos(){
+  const grid=document.getElementById('my-videos-grid');
+  if(!currentUser){ grid.innerHTML=''; return; }
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/users/${currentUser.id}/public`);
+    const data=await resp.json();
+    const videos=data.videos||[];
+    if(!videos.length){ grid.innerHTML='<div class="favs-empty" style="grid-column:1/-1"><div class="favs-empty-icon">🎬</div><div class="empty-title">Sin vídeos aún</div><div class="empty-sub">Sube tu primer vídeo con el botón de arriba.</div></div>'; return; }
+    grid.innerHTML=videos.map(v=>`
+      <div style="position:relative">
+        <video src="${LOCAL_DB_URL}${v.video_url}" controls style="width:100%;border-radius:10px;display:block;background:#000;aspect-ratio:9/16;object-fit:cover"></video>
+        <button onclick="deleteMyVideo(${v.id})" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer">🗑</button>
+      </div>`).join('');
+  }catch(e){ grid.innerHTML='<div class="ia-prose">No se pudieron cargar tus vídeos.</div>'; }
+}
+async function deleteMyVideo(id){
+  if(!confirm('¿Borrar este vídeo?')) return;
+  try{
+    await fetch(`${LOCAL_DB_URL}/api/videos/${id}`,{method:'DELETE',headers:{'Authorization':'Bearer '+authToken}});
+    renderMyVideos();
+  }catch(e){ alert('No se pudo borrar el vídeo.'); }
+}
+async function loadMyFollowCounts(){
+  if(!currentUser) return;
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/users/${currentUser.id}/public`,{headers:{'Authorization':'Bearer '+authToken}});
+    const data=await resp.json();
+    document.getElementById('pstat-followers').textContent=data.followerCount||0;
+    document.getElementById('pstat-following').textContent=data.followingCount||0;
+  }catch(e){/* no pasa nada si falla, se queda en 0 */}
+}
+// ─── Perfil público de cualquier usuario ───
+async function openPublicProfile(userId){
+  if(!userId) return;
+  if(currentUser && userId===currentUser.id){ showPageDirect('perfil'); return; }
+  showPageDirect('public-profile');
+  const body=document.getElementById('pp-body');
+  body.innerHTML='<div class="inline-loading"><div class="spinner"></div> Cargando perfil…</div>';
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/users/${userId}/public`,{headers:authToken?{'Authorization':'Bearer '+authToken}:{}});
+    const data=await resp.json();
+    if(!resp.ok) throw new Error(data.error||'No se pudo cargar el perfil.');
+    const u=data.user;
+    const avaHtml=u.avatar_url?`<div style="width:72px;height:72px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${u.avatar_url}');background-size:cover;background-position:center;margin:0 auto 12px;border:3px solid var(--g2)"></div>`
+      :`<div class="profile-ava" style="margin:0 auto 12px"><span>${u.name.charAt(0).toUpperCase()}</span></div>`;
+    const followBtn=currentUser?`<button class="btn-ia" id="pp-follow-btn" style="width:auto;padding:9px 22px;margin-top:10px" onclick="togglePublicFollow(${u.id})">${data.isFollowing?'✓ Siguiendo':'+ Seguir'}</button>`:'';
+    const videosHtml=(data.videos||[]).length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:10px">${data.videos.map(v=>`<video src="${LOCAL_DB_URL}${v.video_url}" controls style="width:100%;border-radius:10px;display:block;background:#000;aspect-ratio:9/16;object-fit:cover"></video>`).join('')}</div>`:'<div style="font-size:13px;color:var(--textl)">Sin vídeos todavía.</div>';
+    const recsHtml=(data.reviews||[]).length?data.reviews.map(r=>`
+      <div class="review-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong>${r.restaurant_name}</strong><span>${starRatingHTML(r.rating)}</span>
+        </div>
+        <div style="font-size:13px;color:var(--textm);line-height:1.5">${r.text}</div>
+      </div>`).join(''):'<div style="font-size:13px;color:var(--textl)">Sin recomendaciones todavía.</div>';
+    body.innerHTML=`
+      <div style="text-align:center;margin-bottom:20px">
+        ${avaHtml}
+        <div class="profile-name">${u.name}</div>
+        ${u.bio?`<div style="font-size:13px;color:var(--textm);max-width:360px;margin:6px auto">${u.bio}</div>`:''}
+        <div class="profile-stats-row">
+          <div class="pstat" style="cursor:pointer" onclick="openFollowList(${u.id},'followers')"><div class="pstat-num">${data.followerCount}</div><div class="pstat-lbl">Seguidores</div></div>
+          <div class="pstat" style="cursor:pointer" onclick="openFollowList(${u.id},'following')"><div class="pstat-num">${data.followingCount}</div><div class="pstat-lbl">Siguiendo</div></div>
+        </div>
+        ${followBtn}
+      </div>
+      <div class="rep-card" style="margin-bottom:16px"><div class="rep-header">🍽 Recomendaciones</div>${recsHtml}</div>
+      <div class="rep-card"><div class="rep-header">🎬 Vídeos</div>${videosHtml}</div>
+    `;
+  }catch(e){
+    body.innerHTML='<div class="ia-prose">'+e.message+'</div>';
+  }
+}
+async function togglePublicFollow(userId){
+  if(!currentUser){ showLoginPrompt('Inicia sesión para seguir a otras personas.'); return; }
+  const btn=document.getElementById('pp-follow-btn');
+  const isFollowing=btn.textContent.includes('Siguiendo');
+  try{
+    await fetch(`${LOCAL_DB_URL}/api/follow/${userId}`,{method:isFollowing?'DELETE':'POST',headers:{'Authorization':'Bearer '+authToken}});
+    btn.innerHTML=isFollowing?'+ Seguir':'✓ Siguiendo';
+  }catch(e){ alert('No se pudo actualizar. Inténtalo de nuevo.'); }
+}
+async function openFollowList(userId,kind){
+  if(!userId) return;
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/users/${userId}/${kind}`);
+    const data=await resp.json();
+    const rows=data[kind]||[];
+    if(!rows.length){ alert(kind==='followers'?'Todavía nadie le sigue.':'Todavía no sigue a nadie.'); return; }
+    alert(rows.map(u=>u.name).join('\n'));
+  }catch(e){ alert('No se pudo cargar la lista.'); }
 }
 function renderAuthUI(){
   updateProfileHero();
@@ -3417,7 +3579,7 @@ function openCreatorRecommendation(i){
 function profileTab(btn,tab){
   document.querySelectorAll('.profile-nav-item').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['rep','misresenas','foodprint','favs','listas','niveles'].forEach(t=>{
+  ['rep','misresenas','foodprint','favs','listas','videos','niveles'].forEach(t=>{
     const el=document.getElementById('profile-tab-'+t);
     if(el) el.style.display=t===tab?'block':'none';
   });
@@ -3425,6 +3587,7 @@ function profileTab(btn,tab){
   if(tab==='foodprint') renderFoodprint();
   if(tab==='misresenas') renderMyReviews();
   if(tab==='listas') renderMisListas();
+  if(tab==='videos') renderMyVideos();
 }
 
 // ═══════════════════════════════════════════════════════════
