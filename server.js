@@ -22,6 +22,10 @@ const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const ffmpegPath = require('ffmpeg-static');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
 
 const DB_PATH = path.join(__dirname, 'restaurants.sqlite');
 const PORT = process.env.PORT || 3001;
@@ -168,6 +172,47 @@ function makeUploader(dir, allowedMimePrefix, maxSizeMB) {
 }
 const uploadAvatar = makeUploader(AVATARS_DIR, 'image/', 8);
 const uploadVideo = makeUploader(VIDEOS_DIR, 'video/', 100);
+
+// Moderación de contenido: extrae un fotograma del vídeo y le pide a Claude
+// que compruebe que es contenido de comida/restaurantes y apropiado, antes
+// de dejar que se publique. Si algo falla técnicamente (ffmpeg, la API...),
+// dejamos pasar el vídeo en vez de bloquear la subida por un fallo nuestro.
+async function moderateVideoFrame(videoPath) {
+  if (!ANTHROPIC_API_KEY) return { ok: true };
+  const framePath = videoPath + '.frame.jpg';
+  try {
+    await execFileAsync(ffmpegPath, ['-y', '-i', videoPath, '-ss', '00:00:01.000', '-vframes', '1', '-vf', 'scale=512:-1', framePath], { timeout: 20000 });
+    const base64 = fs.readFileSync(framePath).toString('base64');
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 200,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+            { type: 'text', text: 'Analiza esta imagen (un fotograma de un vídeo subido a GastroMap, una app de descubrimiento de restaurantes). Responde SOLO con este JSON, sin nada más: {"food_related": true o false, "appropriate": true o false, "reason": "breve explicación en español, solo si alguno de los dos es false"}. food_related debe ser true si la imagen muestra comida, un plato, un restaurante, una cocina, una bebida, un ingrediente, o cualquier cosa claramente relacionada con gastronomía. appropriate debe ser false si hay contenido sexual, violento, gráfico o inapropiado para todos los públicos.' }
+          ]
+        }]
+      })
+    });
+    const data = await resp.json();
+    const textBlock = (data.content || []).find(b => b.type === 'text');
+    if (!textBlock) return { ok: true };
+    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : textBlock.text);
+    if (parsed.appropriate === false) return { ok: false, reason: parsed.reason || 'El contenido no parece apropiado para GastroMap.' };
+    if (parsed.food_related === false) return { ok: false, reason: parsed.reason || 'GastroMap solo admite contenido relacionado con comida y restaurantes.' };
+    return { ok: true };
+  } catch (e) {
+    console.warn('⚠️  No se pudo moderar el vídeo automáticamente:', e.message);
+    return { ok: true };
+  } finally {
+    try { fs.unlinkSync(framePath); } catch (e) {/* puede que no llegara a crearse */}
+  }
+}
 
 function newToken() { return crypto.randomBytes(32).toString('hex'); }
 
@@ -330,9 +375,15 @@ app.put('/api/users/me/bio', requireAuth, (req, res) => {
 });
 
 app.post('/api/upload/video', requireAuth, (req, res) => {
-  uploadVideo.single('video')(req, res, (err) => {
+  uploadVideo.single('video')(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo.' });
+    const fullPath = path.join(VIDEOS_DIR, req.file.filename);
+    const moderation = await moderateVideoFrame(fullPath);
+    if (!moderation.ok) {
+      try { fs.unlinkSync(fullPath); } catch (e) {/* no pasa nada si ya no está */}
+      return res.status(400).json({ error: '🚫 ' + moderation.reason });
+    }
     const url = `/uploads/videos/${req.file.filename}`;
     const caption = String(req.body?.caption || '').slice(0, 280);
     const location = String(req.body?.location || '').slice(0, 120);

@@ -367,6 +367,8 @@ a{text-decoration:none;color:inherit}
 .bot-card{flex-shrink:0;width:110px;cursor:pointer}
 .bot-card-img{width:110px;height:82px;object-fit:cover;border-radius:8px;display:block;margin-bottom:5px}
 .bot-card-name{font-size:11.5px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vcaption{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vcaption.expanded{display:block;-webkit-line-clamp:unset;overflow:visible}
 .bot-card-score{font-size:11px;color:var(--textl);display:flex;align-items:center;gap:2px}
 .msg-typing{display:flex;gap:4px;padding:14px}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--g3);animation:bounce 1.2s infinite}
@@ -1009,6 +1011,25 @@ a{text-decoration:none;color:inherit}
   </div>
 </div>
 
+<!-- ═══════════════════════════════ RECORTAR FOTO DE PERFIL ═══════════════════════════════ -->
+<div id="avatar-crop-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:6500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--white);border-radius:16px;max-width:360px;width:100%;box-shadow:var(--shadow2);overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--g2)">
+      <button onclick="closeAvatarCrop()" style="background:none;border:none;color:var(--textl);font-size:14px;cursor:pointer;padding:0">Cancelar</button>
+      <div style="font-weight:700;font-size:14px">Ajusta tu foto</div>
+      <button onclick="saveAvatarCrop()" style="background:none;border:none;color:var(--orange);font-weight:700;font-size:14px;cursor:pointer;padding:0">Guardar</button>
+    </div>
+    <div id="avatar-crop-stage" style="position:relative;width:100%;aspect-ratio:1/1;overflow:hidden;background:#111;cursor:grab;touch-action:none">
+      <img id="avatar-crop-img" draggable="false" style="position:absolute;left:0;top:0;transform-origin:0 0;user-select:none;-webkit-user-drag:none">
+      <div style="position:absolute;inset:0;pointer-events:none;box-shadow:0 0 0 2000px rgba(0,0,0,0.55);border-radius:50%"></div>
+    </div>
+    <div style="padding:16px 20px 20px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:13px;color:var(--textl)">🔍</span>
+      <input type="range" id="avatar-crop-zoom" min="1" max="3" step="0.01" value="1" style="flex:1" oninput="onAvatarZoomChange(this.value)">
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════ VER FOTO EN GRANDE ═══════════════════════════════ -->
 <div id="image-lightbox-overlay" onclick="closeImageLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:6000;align-items:center;justify-content:center;padding:24px;cursor:zoom-out">
   <img id="image-lightbox-img" src="" style="max-width:100%;max-height:100%;border-radius:12px;object-fit:contain">
@@ -1047,9 +1068,10 @@ a{text-decoration:none;color:inherit}
       <video id="video-upload-preview" style="width:100%;max-height:320px;background:#000;display:block;object-fit:contain" controls></video>
       <div style="padding:14px 18px">
         <textarea id="video-upload-caption" placeholder="Escribe un pie de foto…" style="width:100%;border:none;resize:none;font-family:'Inter',sans-serif;font-size:14px;outline:none;min-height:60px"></textarea>
-        <div style="display:flex;align-items:center;gap:8px;border-top:1px solid var(--g1);padding-top:12px;margin-top:8px">
+        <div style="display:flex;align-items:center;gap:8px;border-top:1px solid var(--g1);padding-top:12px;margin-top:8px;position:relative">
           <span style="font-size:16px">📍</span>
           <input type="text" id="video-upload-location" placeholder="Añadir ubicación" style="flex:1;border:none;font-family:'Inter',sans-serif;font-size:13px;outline:none">
+          <div class="search-suggest-dropdown" id="video-upload-location-suggest" style="left:24px;top:100%"></div>
         </div>
       </div>
     </div>
@@ -2915,7 +2937,7 @@ function updateProfileHero(){
   if(!nameEl) return;
   if(currentUser){
     nameEl.textContent=currentUser.name;
-    emailEl.textContent=currentUser.email;
+    emailEl.style.display='none';
     if(currentUser.avatar_url){
       avaEl.style.backgroundImage=`url(${LOCAL_DB_URL}${currentUser.avatar_url})`;
       avaLetterEl.style.display='none';
@@ -2928,6 +2950,7 @@ function updateProfileHero(){
     loadMyFollowCounts();
   }else{
     nameEl.textContent='Sin iniciar sesión';
+    emailEl.style.display='block';
     emailEl.textContent='Ve a Ajustes para crear tu cuenta';
     avaEl.style.backgroundImage='none';
     avaLetterEl.style.display='block';
@@ -2936,17 +2959,104 @@ function updateProfileHero(){
   }
   refreshMyReviewCount();
 }
-async function uploadMyAvatar(file){
+// ─── Editor de recorte de foto de perfil: arrastrar para mover, control
+// deslizante para hacer zoom, siempre cubriendo el círculo por completo. ───
+let avatarCrop={file:null,scale:1,minScale:1,x:0,y:0,natW:0,natH:0,dragging:false,startX:0,startY:0,startPanX:0,startPanY:0};
+function uploadMyAvatar(file){
   if(!file||!currentUser) return;
-  const fd=new FormData();
-  fd.append('avatar',file);
-  try{
-    const resp=await fetch(`${LOCAL_DB_URL}/api/upload/avatar`,{method:'POST',headers:{'Authorization':'Bearer '+authToken},body:fd});
-    const data=await resp.json();
-    if(!resp.ok) throw new Error(data.error||'No se pudo subir la foto.');
-    currentUser.avatar_url=data.avatar_url;
-    updateProfileHero();
-  }catch(e){ alert(e.message); }
+  avatarCrop.file=file;
+  const img=document.getElementById('avatar-crop-img');
+  const url=URL.createObjectURL(file);
+  img.onload=()=>{
+    avatarCrop.natW=img.naturalWidth;
+    avatarCrop.natH=img.naturalHeight;
+    const stage=document.getElementById('avatar-crop-stage');
+    const size=stage.clientWidth; // el escenario es cuadrado (aspect-ratio:1/1)
+    avatarCrop.minScale=Math.max(size/avatarCrop.natW, size/avatarCrop.natH);
+    avatarCrop.scale=avatarCrop.minScale;
+    avatarCrop.x=(size-avatarCrop.natW*avatarCrop.scale)/2;
+    avatarCrop.y=(size-avatarCrop.natH*avatarCrop.scale)/2;
+    document.getElementById('avatar-crop-zoom').min=avatarCrop.minScale;
+    document.getElementById('avatar-crop-zoom').max=avatarCrop.minScale*3;
+    document.getElementById('avatar-crop-zoom').value=avatarCrop.minScale;
+    applyAvatarCropTransform();
+    document.getElementById('avatar-crop-overlay').style.display='flex';
+  };
+  img.src=url;
+}
+function applyAvatarCropTransform(){
+  const img=document.getElementById('avatar-crop-img');
+  img.style.width=avatarCrop.natW+'px';
+  img.style.height=avatarCrop.natH+'px';
+  img.style.transform=`translate(${avatarCrop.x}px,${avatarCrop.y}px) scale(${avatarCrop.scale})`;
+}
+function clampAvatarPan(){
+  const stage=document.getElementById('avatar-crop-stage');
+  const size=stage.clientWidth;
+  const w=avatarCrop.natW*avatarCrop.scale, h=avatarCrop.natH*avatarCrop.scale;
+  avatarCrop.x=Math.min(0,Math.max(size-w,avatarCrop.x));
+  avatarCrop.y=Math.min(0,Math.max(size-h,avatarCrop.y));
+}
+function onAvatarZoomChange(val){
+  const stage=document.getElementById('avatar-crop-stage');
+  const size=stage.clientWidth;
+  // Mantiene centrado el punto medio del recorte actual al cambiar el zoom,
+  // en vez de saltar hacia una esquina.
+  const cx=size/2, cy=size/2;
+  const relX=(cx-avatarCrop.x)/avatarCrop.scale, relY=(cy-avatarCrop.y)/avatarCrop.scale;
+  avatarCrop.scale=parseFloat(val);
+  avatarCrop.x=cx-relX*avatarCrop.scale;
+  avatarCrop.y=cy-relY*avatarCrop.scale;
+  clampAvatarPan();
+  applyAvatarCropTransform();
+}
+function initAvatarCropDrag(){
+  const stage=document.getElementById('avatar-crop-stage');
+  stage.addEventListener('pointerdown',(e)=>{
+    avatarCrop.dragging=true;
+    avatarCrop.startX=e.clientX; avatarCrop.startY=e.clientY;
+    avatarCrop.startPanX=avatarCrop.x; avatarCrop.startPanY=avatarCrop.y;
+    stage.setPointerCapture(e.pointerId);
+    stage.style.cursor='grabbing';
+  });
+  stage.addEventListener('pointermove',(e)=>{
+    if(!avatarCrop.dragging) return;
+    avatarCrop.x=avatarCrop.startPanX+(e.clientX-avatarCrop.startX);
+    avatarCrop.y=avatarCrop.startPanY+(e.clientY-avatarCrop.startY);
+    clampAvatarPan();
+    applyAvatarCropTransform();
+  });
+  const stopDrag=()=>{ avatarCrop.dragging=false; stage.style.cursor='grab'; };
+  stage.addEventListener('pointerup',stopDrag);
+  stage.addEventListener('pointercancel',stopDrag);
+}
+function closeAvatarCrop(){
+  document.getElementById('avatar-crop-overlay').style.display='none';
+  document.getElementById('pfl-avatar-input').value='';
+  avatarCrop.file=null;
+}
+async function saveAvatarCrop(){
+  const stage=document.getElementById('avatar-crop-stage');
+  const size=stage.clientWidth;
+  const OUT=400; // resolución final de la foto de perfil guardada
+  const canvas=document.createElement('canvas');
+  canvas.width=OUT; canvas.height=OUT;
+  const ctx=canvas.getContext('2d');
+  const img=document.getElementById('avatar-crop-img');
+  const factor=OUT/size; // el escenario visible puede ser más pequeño que 400px en pantalla
+  ctx.drawImage(img, avatarCrop.x*factor, avatarCrop.y*factor, avatarCrop.natW*avatarCrop.scale*factor, avatarCrop.natH*avatarCrop.scale*factor);
+  canvas.toBlob(async(blob)=>{
+    closeAvatarCrop();
+    const fd=new FormData();
+    fd.append('avatar',blob,'avatar.jpg');
+    try{
+      const resp=await fetch(`${LOCAL_DB_URL}/api/upload/avatar`,{method:'POST',headers:{'Authorization':'Bearer '+authToken},body:fd});
+      const data=await resp.json();
+      if(!resp.ok) throw new Error(data.error||'No se pudo subir la foto.');
+      currentUser.avatar_url=data.avatar_url;
+      updateProfileHero();
+    }catch(e){ alert(e.message); }
+  },'image/jpeg',0.9);
 }
 function onMyAvatarClick(){
   if(currentUser && currentUser.avatar_url){
@@ -3044,7 +3154,7 @@ function renderVideoCard(v,allowDelete){
       ${allowDelete?`<button onclick="deleteMyVideo(${v.id})" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer">🗑</button>`:''}
     </div>
     <div style="padding:12px 14px">
-      ${v.caption?`<div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:8px">${v.caption}</div>`:''}
+      ${v.caption?`<div class="vcaption" onclick="this.classList.toggle('expanded')" style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:8px;cursor:pointer">${v.caption}</div>`:''}
       <div style="display:flex;gap:16px;font-size:12.5px;color:var(--textl);align-items:center">
         <span onclick="toggleVideoLike(${v.id},this)" data-liked="${v.isLiked?'1':'0'}" style="cursor:pointer;display:flex;align-items:center;gap:4px">${heartSVG(!!v.isLiked,14)} <span class="vlike-count">${v.likeCount||0}</span></span>
         <span onclick="toggleVideoComments(${v.id})" style="cursor:pointer">💬 ${v.commentCount||0}</span>
@@ -4062,6 +4172,8 @@ loadAutoLocationPref();
 applyTranslations();
 attachSearchSuggestions('hero-search',{runSearch:heroSearch,includeFood:false});
 attachSearchSuggestions('map-city-input',{runSearch:mapSearch,includeFood:true});
+attachSearchSuggestions('video-upload-location',{runSearch:()=>{},includeFood:false});
+initAvatarCropDrag();
 </script>
 </body>
 </html>
