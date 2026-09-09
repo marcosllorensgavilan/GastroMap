@@ -118,6 +118,20 @@ appDb.exec(`
     text TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS favorites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    restaurant_id TEXT NOT NULL,
+    data TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(user_id, restaurant_id)
+  );
+  CREATE TABLE IF NOT EXISTS saved_lists (
+    user_id INTEGER NOT NULL,
+    list_index INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, list_index)
+  );
 `);
 // Estas dos columnas se añadieron después del lanzamiento — ALTER TABLE con
 // comprobación, para que no falle en instalaciones que ya tenían la tabla
@@ -399,6 +413,50 @@ app.get('/api/users/:id/public', (req, res) => {
     });
   res.json({ user, followerCount, followingCount, isFollowing, reviews, videos });
 });
+// ═══════════════════════════════════════════════════════════════
+// FAVORITOS Y LISTAS GUARDADAS — ligados a la cuenta, no al dispositivo.
+// ═══════════════════════════════════════════════════════════════
+app.get('/api/favorites/mine', requireAuth, (req, res) => {
+  const rows = appDb.prepare('SELECT data FROM favorites WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
+  res.json({ favorites: rows.map(r => JSON.parse(r.data)) });
+});
+app.post('/api/favorites', requireAuth, (req, res) => {
+  const detail = req.body || {};
+  if (!detail.id) return res.status(400).json({ error: 'Falta el id del restaurante.' });
+  const withDate = { ...detail, addedAt: new Date().toISOString() };
+  appDb.prepare(`
+    INSERT INTO favorites (user_id, restaurant_id, data, created_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id, restaurant_id) DO UPDATE SET data = excluded.data
+  `).run(req.user.id, String(detail.id), JSON.stringify(withDate), new Date().toISOString());
+  res.json({ ok: true });
+});
+app.delete('/api/favorites/:restaurantId', requireAuth, (req, res) => {
+  appDb.prepare('DELETE FROM favorites WHERE user_id = ? AND restaurant_id = ?').run(req.user.id, req.params.restaurantId);
+  res.json({ ok: true });
+});
+app.delete('/api/favorites/mine/all', requireAuth, (req, res) => {
+  const info = appDb.prepare('DELETE FROM favorites WHERE user_id = ?').run(req.user.id);
+  res.json({ ok: true, deleted: info.changes });
+});
+
+app.get('/api/saved-lists/mine', requireAuth, (req, res) => {
+  const rows = appDb.prepare('SELECT list_index FROM saved_lists WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
+  res.json({ savedLists: rows.map(r => r.list_index) });
+});
+app.post('/api/saved-lists/:index', requireAuth, (req, res) => {
+  appDb.prepare('INSERT OR IGNORE INTO saved_lists (user_id, list_index, created_at) VALUES (?,?,?)')
+    .run(req.user.id, parseInt(req.params.index, 10), new Date().toISOString());
+  res.json({ ok: true });
+});
+app.delete('/api/saved-lists/:index', requireAuth, (req, res) => {
+  appDb.prepare('DELETE FROM saved_lists WHERE user_id = ? AND list_index = ?').run(req.user.id, parseInt(req.params.index, 10));
+  res.json({ ok: true });
+});
+app.delete('/api/saved-lists/mine/all', requireAuth, (req, res) => {
+  const info = appDb.prepare('DELETE FROM saved_lists WHERE user_id = ?').run(req.user.id);
+  res.json({ ok: true, deleted: info.changes });
+});
+
 app.get('/api/users/:id/followers', (req, res) => {
   const rows = appDb.prepare(`
     SELECT u.id, u.name, u.avatar_url FROM follows f JOIN users u ON u.id = f.follower_id
