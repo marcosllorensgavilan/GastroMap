@@ -1009,6 +1009,26 @@ a{text-decoration:none;color:inherit}
   </div>
 </div>
 
+<!-- ═══════════════════════════════ VER FOTO EN GRANDE ═══════════════════════════════ -->
+<div id="image-lightbox-overlay" onclick="closeImageLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:6000;align-items:center;justify-content:center;padding:24px;cursor:zoom-out">
+  <img id="image-lightbox-img" src="" style="max-width:100%;max-height:100%;border-radius:12px;object-fit:contain">
+</div>
+
+<!-- ═══════════════════════════════ EDITAR BIO ═══════════════════════════════ -->
+<div id="bio-edit-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:5000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--white);border-radius:16px;max-width:380px;width:100%;box-shadow:var(--shadow2)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--g2)">
+      <button onclick="closeBioEditModal()" style="background:none;border:none;color:var(--textl);font-size:14px;cursor:pointer;padding:0">Cancelar</button>
+      <div style="font-weight:700;font-size:14px">Editar bio</div>
+      <button onclick="saveBioEdit()" style="background:none;border:none;color:var(--orange);font-weight:700;font-size:14px;cursor:pointer;padding:0">Guardar</button>
+    </div>
+    <div style="padding:18px">
+      <textarea id="bio-edit-textarea" maxlength="280" placeholder="Cuéntanos algo sobre ti…" style="width:100%;min-height:110px;border:1px solid var(--g2);border-radius:10px;padding:12px;font-family:'Inter',sans-serif;font-size:14px;resize:vertical;outline:none" oninput="document.getElementById('bio-edit-count').textContent=this.value.length+'/280'"></textarea>
+      <div id="bio-edit-count" style="text-align:right;font-size:11px;color:var(--textl);margin-top:6px">0/280</div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════ NUEVA PUBLICACIÓN (VÍDEO) ═══════════════════════════════ -->
 <div id="video-upload-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:5000;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--white);border-radius:16px;max-width:400px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow2)">
@@ -1120,9 +1140,9 @@ a{text-decoration:none;color:inherit}
 <!-- ═══════════════════════════════ PERFIL ═══════════════════════════════ -->
 <div id="page-perfil" class="page">
   <div class="profile-hero" style="display:flex;align-items:flex-start;gap:18px;text-align:left;padding:32px 24px;max-width:720px;margin:0 auto">
-    <div class="profile-ava" id="pfl-avatar" onclick="document.getElementById('pfl-avatar-input').click()" style="cursor:pointer;position:relative;background-size:cover;background-position:center;margin:0;flex-shrink:0;width:100px;height:100px;font-size:38px">
+    <div class="profile-ava" id="pfl-avatar" onclick="onMyAvatarClick()" style="cursor:pointer;position:relative;background-size:cover;background-position:center;margin:0;flex-shrink:0;width:100px;height:100px;font-size:38px">
       <span id="pfl-avatar-letter">?</span>
-      <div style="position:absolute;bottom:-2px;right:-2px;background:var(--orange);color:white;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;border:2px solid var(--bg)">📷</div>
+      <div onclick="event.stopPropagation();document.getElementById('pfl-avatar-input').click()" style="position:absolute;bottom:-2px;right:-2px;background:var(--orange);color:white;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;border:2px solid var(--bg)">📷</div>
     </div>
     <input type="file" id="pfl-avatar-input" accept="image/*" style="display:none" onchange="uploadMyAvatar(this.files[0])">
     <div style="flex:1;padding-top:2px">
@@ -1180,6 +1200,10 @@ a{text-decoration:none;color:inherit}
     </div>
     <div id="profile-tab-actividad" style="display:none">
       <div class="rep-card" style="margin-bottom:16px">
+        <div class="rep-header">👣 Foodprint</div>
+        <div id="foodprint-body"></div>
+      </div>
+      <div class="rep-card" style="margin-bottom:16px">
         <div class="rep-header">🏆 Sistema de Reputación</div>
         <div class="rep-progress">
           <span id="rep-level-name">Foodie</span><span id="rep-level-pts">0 puntos</span>
@@ -1193,7 +1217,7 @@ a{text-decoration:none;color:inherit}
         <div class="earn-item">📝 Publicar reseña: <strong style="margin-left:4px">+10 pts</strong></div>
         <div class="earn-item"><svg width="15" height="15" viewBox="0 0 24 24" style="vertical-align:-3px"><defs><linearGradient id="ghstatic" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F3CE7E"/><stop offset="100%" stop-color="#D08A2E"/></linearGradient></defs><path d="M12,21.35l-1.45-1.32C5.4,15.36,2,12.28,2,8.5 2,5.42,4.42,3,7.5,3c1.74,0,3.41,0.81,4.5,2.09C13.09,3.81,14.76,3,16.5,3 19.58,3,22,5.42,22,8.5c0,3.78-3.4,6.86-8.55,11.54L12,21.35z" fill="url(#ghstatic)"/></svg> Guardar favorito: <strong style="margin-left:4px">+2 pts</strong></div>
       </div>
-      <div class="rep-card" style="margin-bottom:16px">
+      <div class="rep-card">
         <div class="rep-header">⭐ Niveles</div>
         <div class="level-list">
           <div class="level-row" id="level-row-0"><div class="level-icon">⭐</div><div class="level-name">Foodie</div><div class="level-pts">0+ puntos</div><div class="current-badge" id="level-badge-0" style="display:none">Actual</div></div>
@@ -1201,10 +1225,6 @@ a{text-decoration:none;color:inherit}
           <div class="level-row" id="level-row-2"><div class="level-icon">🌐</div><div class="level-name">Experto Local</div><div class="level-pts">200+ puntos</div><div class="current-badge" id="level-badge-2" style="display:none">Actual</div></div>
           <div class="level-row" id="level-row-3"><div class="level-icon">🛡</div><div class="level-name">Crítico Verificado</div><div class="level-pts">500+ puntos</div><div class="current-badge" id="level-badge-3" style="display:none">Actual</div></div>
         </div>
-      </div>
-      <div class="rep-card">
-        <div class="rep-header">👣 Foodprint</div>
-        <div id="foodprint-body"></div>
       </div>
     </div>
   </div>
@@ -2928,10 +2948,35 @@ async function uploadMyAvatar(file){
     updateProfileHero();
   }catch(e){ alert(e.message); }
 }
-async function editMyBio(){
+function onMyAvatarClick(){
+  if(currentUser && currentUser.avatar_url){
+    openImageLightbox(`${LOCAL_DB_URL}${currentUser.avatar_url}`);
+  }else{
+    document.getElementById('pfl-avatar-input').click();
+  }
+}
+function openImageLightbox(url){
+  if(!url) return;
+  document.getElementById('image-lightbox-img').src=url;
+  document.getElementById('image-lightbox-overlay').style.display='flex';
+}
+function closeImageLightbox(){
+  document.getElementById('image-lightbox-overlay').style.display='none';
+}
+function editMyBio(){
   if(!currentUser) return;
-  const nueva=prompt('Cuéntanos algo sobre ti (máx. 280 caracteres):', currentUser.bio||'');
-  if(nueva===null) return;
+  const ta=document.getElementById('bio-edit-textarea');
+  ta.value=currentUser.bio||'';
+  document.getElementById('bio-edit-count').textContent=ta.value.length+'/280';
+  document.getElementById('bio-edit-overlay').style.display='flex';
+  ta.focus();
+}
+function closeBioEditModal(){
+  document.getElementById('bio-edit-overlay').style.display='none';
+}
+async function saveBioEdit(){
+  const nueva=document.getElementById('bio-edit-textarea').value;
+  closeBioEditModal();
   try{
     const resp=await fetch(`${LOCAL_DB_URL}/api/users/me/bio`,{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({bio:nueva})});
     const data=await resp.json();
@@ -3092,7 +3137,7 @@ async function openPublicProfile(userId){
     const data=await resp.json();
     if(!resp.ok) throw new Error(data.error||'No se pudo cargar el perfil.');
     const u=data.user;
-    const avaHtml=u.avatar_url?`<div style="width:72px;height:72px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${u.avatar_url}');background-size:cover;background-position:center;margin:0 auto 12px;border:3px solid var(--g2)"></div>`
+    const avaHtml=u.avatar_url?`<div onclick="openImageLightbox('${LOCAL_DB_URL}${u.avatar_url}')" style="width:72px;height:72px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${u.avatar_url}');background-size:cover;background-position:center;margin:0 auto 12px;border:3px solid var(--g2);cursor:pointer"></div>`
       :`<div class="profile-ava" style="margin:0 auto 12px"><span>${u.name.charAt(0).toUpperCase()}</span></div>`;
     const followBtn=currentUser?`<button class="btn-ia" id="pp-follow-btn" style="width:auto;padding:9px 22px;margin-top:10px" onclick="togglePublicFollow(${u.id})">${data.isFollowing?'✓ Siguiendo':'+ Seguir'}</button>`:'';
     const videosHtml=(data.videos||[]).length?`<div style="max-width:360px;margin-top:10px">${data.videos.map(v=>renderVideoCard(v,false)).join('')}</div>`:'<div style="font-size:13px;color:var(--textl)">Sin vídeos todavía.</div>';
