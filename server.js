@@ -571,7 +571,7 @@ app.get('/api/restaurants', (req, res) => {
   const n = parseFloat(req.query.n);
   const w = parseFloat(req.query.w);
   const e = parseFloat(req.query.e);
-  const limit = Math.min(parseInt(req.query.limit || '200', 10), 500);
+  const limit = Math.min(parseInt(req.query.limit || '200', 10), 3000);
   const amenity = req.query.amenity && req.query.amenity !== 'todos' ? req.query.amenity : null;
   const cuisine = req.query.cuisine && req.query.cuisine !== 'Todas' ? req.query.cuisine : null;
 

@@ -1500,7 +1500,7 @@ function fakeReviews(name){
 // localhost como en la IP local del Mac, para que el móvil también pueda usarlo).
 const LOCAL_DB_URL = '';
 
-async function fetchOSMBBox(s,n,w,e,amenity,cuisine){
+async function fetchOSMBBox(s,n,w,e,amenity,cuisine,limit){
   // 1) Intenta primero tu base de datos local — más rápida y no depende de
   //    Overpass ni de los bloqueos de red en España. Pero si no tiene datos
   //    para esta zona (p.ej. un usuario español de viaje en Australia),
@@ -1510,7 +1510,7 @@ async function fetchOSMBBox(s,n,w,e,amenity,cuisine){
   try{
     const ctrl=new AbortController();
     const t=setTimeout(()=>ctrl.abort(),3000);
-    let url=`${LOCAL_DB_URL}/api/restaurants?s=${s}&n=${n}&w=${w}&e=${e}&limit=60`;
+    let url=`${LOCAL_DB_URL}/api/restaurants?s=${s}&n=${n}&w=${w}&e=${e}&limit=${limit||60}`;
     if(amenity && amenity!=='todos') url+=`&amenity=${encodeURIComponent(amenity)}`;
     if(cuisine && cuisine!=='Todas') url+=`&cuisine=${encodeURIComponent(cuisine)}`;
     const resp=await fetch(url,{signal:ctrl.signal});
@@ -1563,7 +1563,7 @@ async function fetchOSMBBox(s,n,w,e,amenity,cuisine){
     .filter(p=>p.lat&&p.lon)
     .sort((a,b)=>parseFloat(b.score)-parseFloat(a.score));
 }
-async function fetchOSMCity(city){
+async function fetchOSMCity(city,limit){
   let geo;
   try{
     const ctrl=new AbortController();
@@ -1578,7 +1578,7 @@ async function fetchOSMCity(city){
   if(!geoData.length) throw new Error('Ciudad no encontrada');
   const {lat,lon,boundingbox} = geoData[0];
   const [s,n,w,e] = boundingbox.map(Number);
-  const places = await fetchOSMBBox(s,n,w,e);
+  const places = await fetchOSMBBox(s,n,w,e,null,null,limit);
   return {places,lat,lon,bbox:[s,n,w,e]};
 }
 
@@ -3456,7 +3456,7 @@ async function findLocationContext(text){
   const candidates=extractLocationCandidates(text);
   for(const place of candidates){
     try{
-      const {places}=await fetchOSMCity(place);
+      const {places}=await fetchOSMCity(place,2000);
       if(places.length){
         botLastLocation=place;
         const {text:listing,pool}=buildListing(places,text);
@@ -3469,7 +3469,7 @@ async function findLocationContext(text){
   // tipo "¿y por 25€?"), la reutilizamos en vez de perder el contexto.
   if(botLastLocation){
     try{
-      const {places}=await fetchOSMCity(botLastLocation);
+      const {places}=await fetchOSMCity(botLastLocation,2000);
       if(places.length){
         const {text:listing,pool}=buildListing(places,text);
         return {place:botLastLocation, listing, places:pool};
@@ -3521,18 +3521,31 @@ async function runIAChefWithParams(params){
     let osmContext='';
     let iaChefPool=[];
     try{
-      const {places}=await fetchOSMCity(city);
+      const {places}=await fetchOSMCity(city,2000);
       if(places.length){
-        iaChefPool=places;
+        // Igual que en GastroBot y Viajero: si hay una cocina concreta
+        // elegida, filtramos los candidatos por eso — antes siempre se
+        // mandaban los mismos "mejores puntuados" de la ciudad diera igual
+        // qué cocina se pidiera, por eso salían siempre los mismos sitios.
+        const cuisineMatches=matchFoodKeywordsInText(cuisines);
+        let pool=places;
+        if(cuisineMatches){
+          const filtered=places.filter(p=>{
+            const c=(p.tags.cuisine||'').toLowerCase();
+            return cuisineMatches.some(m=>c.includes(m));
+          });
+          if(filtered.length) pool=filtered;
+        }
+        iaChefPool=pool;
         osmContext=`\n\nDatos reales de OpenStreetMap para ${city} (úsalos preferentemente):\n`+
-          places.slice(0,25).map(p=>`- ${p.name} (${fmtCuisine(p.tags)||cap(p.tags.amenity)}${p.tags['addr:street']?', '+p.tags['addr:street']:''})`).join('\n');
+          pool.slice(0,25).map(p=>`- ${p.name} (${fmtCuisine(p.tags)||cap(p.tags.amenity)}${p.tags['addr:street']?', '+p.tags['addr:street']:''})`).join('\n');
       }
     }catch(e){/* si falla OSM, seguimos sin datos reales */}
     window.__lastIAChefPool=iaChefPool;
     window.__lastIAChefCity=city;
     const alergiaTexto=alergias?`\n\nIMPORTANTE — Alergias/intolerancias alimentarias del usuario: ${alergias}. Elige SOLO restaurantes que puedan ofrecer opciones seguras y sin contacto cruzado para estos alérgenos, y menciónalo explícitamente en el campo "why" de cada recomendación (qué opción segura tienen para esa alergia). Si un restaurante no puede garantizarlo, no lo incluyas.`:'';
     const prompt=`Soy un usuario de GastroMap buscando restaurantes. Ciudad: ${city}. Presupuesto: ${budget}€ por persona. Cocina preferida: ${cuisines}. Ocasión: ${ocasion}.${osmContext}${alergiaTexto}\n\nDame una respuesta en formato JSON con esta forma exacta: {"intro":"1-2 frases conversacionales explicando tu razonamiento para estas recomendaciones en concreto, mencionando de forma natural la ciudad/presupuesto/ocasión que has tenido en cuenta","recommendations":[{"name":"...","cuisine":"...","neighborhood":"...","price":"...","why":"...","emoji":"..."}]}. Exactamente 4 recomendaciones. IMPORTANTE: el JSON debe ser válido — evita usar comillas dobles (") dentro de los textos; si necesitas citar algo, usa comillas simples (') en su lugar. No pongas saltos de línea dentro de los valores de texto. Responde solo con el JSON, sin texto adicional ni bloques de código.`;
-    const text0=await callClaude({system:GASTROMAP_EXPERT_PROMPT, messages:[{role:'user',content:prompt}], max_tokens:1600});
+    const text0=await callClaude({system:GASTROMAP_EXPERT_PROMPT, messages:[{role:'user',content:prompt}], max_tokens:3000});
     const parsed=parseJSONFromClaude(text0);
     const recs=parsed.recommendations||parsed;
     const intro=parsed.intro||'';
@@ -3724,7 +3737,7 @@ async function runViajero(){
   try{
     let osmContext='';
     try{
-      const {places}=await fetchOSMCity(city);
+      const {places}=await fetchOSMCity(city,2000);
       if(places.length){
         // Si hay preferencias de cocina seleccionadas, filtramos los propios
         // candidatos por eso — antes solo se le mencionaban a la IA como
@@ -4067,7 +4080,7 @@ async function generateFoodprintInsight(){
       }catch(e){/* si falla, seguimos solo con favoritos */}
     }
     const prompt=`Aquí tienes los restaurantes que un usuario ha guardado como favoritos en GastroMap: ${favSummary||'ninguno todavía'}.${reviewSummary}\n\nDame una respuesta en formato JSON con esta forma exacta: {"insight":"3-4 frases en tono cercano y curioso analizando sus patrones gastronómicos — qué cocina repite, qué podría explorar que aún no ha probado. Un párrafo natural, sin listas.","suggestions":["2-3 tipos de cocina o platos MUY concretos para probar, cada uno de 1-3 palabras, p.ej. 'ramen', 'cocina peruana', 'tapas de autor'"]}. IMPORTANTE: el JSON debe ser válido — evita usar comillas dobles (") dentro de los textos; usa comillas simples (') si necesitas citar algo. No pongas saltos de línea dentro de los valores. Responde solo con el JSON, sin texto adicional ni bloques de código.`;
-    const text0=await callClaude({system:GASTROMAP_EXPERT_PROMPT,messages:[{role:'user',content:prompt}]});
+    const text0=await callClaude({system:GASTROMAP_EXPERT_PROMPT,messages:[{role:'user',content:prompt}],max_tokens:800});
     const parsed=parseJSONFromClaude(text0);
     const chips=(parsed.suggestions||[]).map(s=>`<button class="chip-opt" onclick="exploreFoodprintSuggestion('${s.replace(/'/g,"\\'")}')" style="margin:4px 6px 0 0">🔍 ${s}</button>`).join('');
     el.innerHTML=`<div class="ia-prose">${renderMarkdown(parsed.insight||'')}</div>${chips?`<div style="margin-top:10px">${chips}</div>`:''}<button class="btn-ia" style="margin-top:14px" onclick="generateFoodprintInsight()">🔄 Regenerar</button>`;
