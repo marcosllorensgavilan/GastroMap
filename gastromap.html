@@ -3430,7 +3430,9 @@ function matchFoodKeywordsInText(text){
   const q=text.toLowerCase();
   let matches=[];
   for(const key in FOOD_KEYWORDS){
-    const re=new RegExp('\\b'+key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
+    // Tolera el plural más habitual (paella -> paellas, tapa -> tapas) sin
+    // tener que duplicar cada palabra en el diccionario.
+    const re=new RegExp('\\b'+key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'s?\\b','i');
     if(re.test(q)) matches.push(...FOOD_KEYWORDS[key]);
   }
   return matches.length?[...new Set(matches)]:null;
@@ -3529,7 +3531,7 @@ async function runIAChefWithParams(params){
     window.__lastIAChefPool=iaChefPool;
     window.__lastIAChefCity=city;
     const alergiaTexto=alergias?`\n\nIMPORTANTE — Alergias/intolerancias alimentarias del usuario: ${alergias}. Elige SOLO restaurantes que puedan ofrecer opciones seguras y sin contacto cruzado para estos alérgenos, y menciónalo explícitamente en el campo "why" de cada recomendación (qué opción segura tienen para esa alergia). Si un restaurante no puede garantizarlo, no lo incluyas.`:'';
-    const prompt=`Soy un usuario de GastroMap buscando restaurantes. Ciudad: ${city}. Presupuesto: ${budget}€ por persona. Cocina preferida: ${cuisines}. Ocasión: ${ocasion}.${osmContext}${alergiaTexto}\n\nDame una respuesta en formato JSON con esta forma exacta: {"intro":"1-2 frases conversacionales explicando tu razonamiento para estas recomendaciones en concreto, mencionando de forma natural la ciudad/presupuesto/ocasión que has tenido en cuenta","recommendations":[{"name":"...","cuisine":"...","neighborhood":"...","price":"...","why":"...","emoji":"..."}]}. Exactamente 4 recomendaciones. Solo JSON, sin texto adicional.`;
+    const prompt=`Soy un usuario de GastroMap buscando restaurantes. Ciudad: ${city}. Presupuesto: ${budget}€ por persona. Cocina preferida: ${cuisines}. Ocasión: ${ocasion}.${osmContext}${alergiaTexto}\n\nDame una respuesta en formato JSON con esta forma exacta: {"intro":"1-2 frases conversacionales explicando tu razonamiento para estas recomendaciones en concreto, mencionando de forma natural la ciudad/presupuesto/ocasión que has tenido en cuenta","recommendations":[{"name":"...","cuisine":"...","neighborhood":"...","price":"...","why":"...","emoji":"..."}]}. Exactamente 4 recomendaciones. IMPORTANTE: el JSON debe ser válido — evita usar comillas dobles (") dentro de los textos; si necesitas citar algo, usa comillas simples (') en su lugar. No pongas saltos de línea dentro de los valores de texto. Responde solo con el JSON, sin texto adicional ni bloques de código.`;
     const text0=await callClaude({system:GASTROMAP_EXPERT_PROMPT, messages:[{role:'user',content:prompt}], max_tokens:1600});
     const parsed=parseJSONFromClaude(text0);
     const recs=parsed.recommendations||parsed;
@@ -3724,8 +3726,22 @@ async function runViajero(){
     try{
       const {places}=await fetchOSMCity(city);
       if(places.length){
-        const breakfast=places.filter(p=>['cafe','bakery'].includes(p.tags.amenity)).slice(0,10);
-        const mains=places.filter(p=>['restaurant','fast_food','pub','bar'].includes(p.tags.amenity)).slice(0,20);
+        // Si hay preferencias de cocina seleccionadas, filtramos los propios
+        // candidatos por eso — antes solo se le mencionaban a la IA como
+        // texto, pero seguía recibiendo siempre el mismo top de la ciudad
+        // sin importar la preferencia, así que el plan acababa repitiendo
+        // los mismos sitios diera igual lo que se pidiera.
+        const prefMatches=matchFoodKeywordsInText(preferencias);
+        const filterByPref=(arr)=>{
+          if(!prefMatches) return arr;
+          const filtered=arr.filter(p=>{
+            const c=(p.tags.cuisine||'').toLowerCase();
+            return prefMatches.some(m=>c.includes(m));
+          });
+          return filtered.length?filtered:arr;
+        };
+        const breakfast=filterByPref(places.filter(p=>['cafe','bakery'].includes(p.tags.amenity))).slice(0,10);
+        const mains=filterByPref(places.filter(p=>['restaurant','fast_food','pub','bar'].includes(p.tags.amenity))).slice(0,20);
         const fmt=p=>`- ${p.name} (${fmtCuisine(p.tags)||cap(p.tags.amenity)}${p.tags['addr:street']?', '+p.tags['addr:street']:''})`;
         osmContext=`\n\nDatos reales de OpenStreetMap para ${city} (úsalos preferentemente en el plan, en vez de inventar nombres):\n`+
           `Para desayuno (cafés/panaderías):\n${breakfast.map(fmt).join('\n')||'(sin datos específicos, usa tu criterio)'}\n\n`+
@@ -3734,7 +3750,7 @@ async function runViajero(){
     }catch(e){/* si falla OSM, seguimos sin datos reales */}
     const prefTexto=preferencias?`\n\nPreferencias del viaje: ${preferencias}. Ten esto muy en cuenta al elegir cada sitio del plan.`:'';
     const alergiaTexto=alergias?`\n\nIMPORTANTE — Alergias/intolerancias alimentarias del usuario: ${alergias}. En cada comida del plan (desayuno, comida y cena) elige SOLO opciones que puedan garantizar una alternativa segura para estos alérgenos, y menciónalo brevemente en el campo "desc". Si un sitio no puede garantizarlo, no lo incluyas y elige otro.`:'';
-    const prompt=`Crea un plan gastronómico de ${dias} día(s) para ${city}. Para cada día proporciona desayuno, comida y cena.${osmContext}${prefTexto}${alergiaTexto}\n\nFormato JSON: [{"day":1,"title":"...","breakfast":{"name":"...","desc":"...","price":"...","neighborhood":"..."},"lunch":{"name":"...","desc":"...","price":"...","neighborhood":"..."},"dinner":{"name":"...","desc":"...","price":"...","neighborhood":"..."}}]. Solo JSON.`;
+    const prompt=`Crea un plan gastronómico de ${dias} día(s) para ${city}. Para cada día proporciona desayuno, comida y cena.${osmContext}${prefTexto}${alergiaTexto}\n\nFormato JSON: [{"day":1,"title":"...","breakfast":{"name":"...","desc":"...","price":"...","neighborhood":"..."},"lunch":{"name":"...","desc":"...","price":"...","neighborhood":"..."},"dinner":{"name":"...","desc":"...","price":"...","neighborhood":"..."}}]. IMPORTANTE: el JSON debe ser válido — evita comillas dobles (") dentro de los textos, usa comillas simples (') si hace falta citar algo, y no pongas saltos de línea dentro de los valores. Solo JSON, sin bloques de código.`;
     const text0=await callClaude({system:GASTROMAP_EXPERT_PROMPT, messages:[{role:'user',content:prompt}], max_tokens:Math.min(1200*parseInt(dias,10)+800,8000)});
     const days=parseJSONFromClaude(text0);
     plan.innerHTML='<div class="viajero-plan">'+days.map(d=>`
@@ -4050,7 +4066,7 @@ async function generateFoodprintInsight(){
         if(reviews.length) reviewSummary=' Reseñas que ha escrito: '+reviews.map(r=>`${r.restaurant_name} (le puso ${r.rating}★)`).join('; ')+'.';
       }catch(e){/* si falla, seguimos solo con favoritos */}
     }
-    const prompt=`Aquí tienes los restaurantes que un usuario ha guardado como favoritos en GastroMap: ${favSummary||'ninguno todavía'}.${reviewSummary}\n\nDame una respuesta en formato JSON con esta forma exacta: {"insight":"3-4 frases en tono cercano y curioso analizando sus patrones gastronómicos — qué cocina repite, qué podría explorar que aún no ha probado. Un párrafo natural, sin listas.","suggestions":["2-3 tipos de cocina o platos MUY concretos para probar, cada uno de 1-3 palabras, p.ej. 'ramen', 'cocina peruana', 'tapas de autor'"]}. Solo JSON, sin texto adicional.`;
+    const prompt=`Aquí tienes los restaurantes que un usuario ha guardado como favoritos en GastroMap: ${favSummary||'ninguno todavía'}.${reviewSummary}\n\nDame una respuesta en formato JSON con esta forma exacta: {"insight":"3-4 frases en tono cercano y curioso analizando sus patrones gastronómicos — qué cocina repite, qué podría explorar que aún no ha probado. Un párrafo natural, sin listas.","suggestions":["2-3 tipos de cocina o platos MUY concretos para probar, cada uno de 1-3 palabras, p.ej. 'ramen', 'cocina peruana', 'tapas de autor'"]}. IMPORTANTE: el JSON debe ser válido — evita usar comillas dobles (") dentro de los textos; usa comillas simples (') si necesitas citar algo. No pongas saltos de línea dentro de los valores. Responde solo con el JSON, sin texto adicional ni bloques de código.`;
     const text0=await callClaude({system:GASTROMAP_EXPERT_PROMPT,messages:[{role:'user',content:prompt}]});
     const parsed=parseJSONFromClaude(text0);
     const chips=(parsed.suggestions||[]).map(s=>`<button class="chip-opt" onclick="exploreFoodprintSuggestion('${s.replace(/'/g,"\\'")}')" style="margin:4px 6px 0 0">🔍 ${s}</button>`).join('');
