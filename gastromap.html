@@ -3410,6 +3410,7 @@ Nunca recomiendes ni menciones otras apps, webs o servicios de terceros (Google 
 
 Sé específico, útil, entusiasta y cercano. Responde en el mismo idioma en el que te escriban.`;
 let botLastLocation=null; // recuerda la última ciudad detectada en esta conversación
+let botLastCuisineMatches=null; // recuerda el último filtro de cocina/plato mencionado, para que preguntas de seguimiento no lo pierdan
 function extractLocationCandidates(text){
   const candidates=[];
   // 1) Palabras con mayúscula tras "en"/"in" (lo más fiable: "en Denia", "en Nueva York")
@@ -3437,8 +3438,11 @@ function matchFoodKeywordsInText(text){
   }
   return matches.length?[...new Set(matches)]:null;
 }
-function buildListing(places,text){
-  const cuisineMatches=matchFoodKeywordsInText(text);
+function buildListing(places,text,carriedMatches){
+  // Si este mensaje menciona una cocina/plato, se usa esa. Si no menciona
+  // ninguna (p.ej. "¿y algo más barato?"), seguimos con la que ya sabíamos
+  // de esta misma conversación, en vez de perderla y volver a lo genérico.
+  const cuisineMatches=matchFoodKeywordsInText(text)||carriedMatches||null;
   let pool=places;
   let filteredNote='';
   if(cuisineMatches){
@@ -3450,7 +3454,7 @@ function buildListing(places,text){
     else { filteredNote=' (ninguno etiquetado exactamente como lo pedido — son los mejores disponibles en la zona igualmente, coméntalo si recomiendas alguno)'; }
   }
   const top=pool.slice(0,20).map(p=>`- ${p.name} (${fmtCuisine(p.tags)||cap(p.tags.amenity)}, ★${p.score}${p.tags['addr:street']?', '+p.tags['addr:street']:''})`).join('\n');
-  return {text:top+filteredNote, pool};
+  return {text:top+filteredNote, pool, cuisineMatches};
 }
 async function findLocationContext(text){
   const candidates=extractLocationCandidates(text);
@@ -3459,7 +3463,8 @@ async function findLocationContext(text){
       const {places}=await fetchOSMCity(place,2000);
       if(places.length){
         botLastLocation=place;
-        const {text:listing,pool}=buildListing(places,text);
+        const {text:listing,pool,cuisineMatches}=buildListing(places,text,botLastCuisineMatches);
+        botLastCuisineMatches=cuisineMatches;
         return {place, listing, places:pool};
       }
     }catch(e){/* prueba el siguiente candidato */}
@@ -3471,7 +3476,8 @@ async function findLocationContext(text){
     try{
       const {places}=await fetchOSMCity(botLastLocation,2000);
       if(places.length){
-        const {text:listing,pool}=buildListing(places,text);
+        const {text:listing,pool,cuisineMatches}=buildListing(places,text,botLastCuisineMatches);
+        botLastCuisineMatches=cuisineMatches;
         return {place:botLastLocation, listing, places:pool};
       }
     }catch(e){/* seguimos sin contexto */}
@@ -3611,6 +3617,7 @@ function openRestaurantFromIA(r){
 function newBotChat(){
   botHistory=[];
   botLastLocation=null;
+  botLastCuisineMatches=null;
   document.getElementById('bot-messages').innerHTML=`<div class="bot-empty" id="bot-empty">
     <div class="bot-empty-icon">🍽</div>
     <div class="bot-empty-title">GastroBot a tu servicio</div>
@@ -3643,7 +3650,7 @@ async function sendBot(){
   try{
     // Busca en OpenStreetMap si el mensaje menciona una zona, para responder con sitios reales
     const ctx=await findLocationContext(text);
-    let system=GASTROMAP_EXPERT_PROMPT+'\n\nEres GastroBot dentro de la app GastroMap. Usa emojis de comida de forma natural. Escribe en párrafos cortos y conversacionales, con como mucho un par de negritas para lo más importante — evita listas largas con muchos guiones, porque los sitios concretos que menciones ya se muestran aparte como tarjetas con foto, así que no hace falta que los repitas todos en el texto uno por uno.';
+    let system=GASTROMAP_EXPERT_PROMPT+'\n\nEres GastroBot dentro de la app GastroMap. Usa emojis de comida de forma natural. Escribe en párrafos cortos y conversacionales, con como mucho un par de negritas para lo más importante — evita listas largas con muchos guiones, porque los sitios concretos que menciones ya se muestran aparte como tarjetas con foto, así que no hace falta que los repitas todos en el texto uno por uno. Ten en cuenta TODO el hilo de la conversación, no solo el último mensaje: si antes se mencionó una alergia, un presupuesto, una ocasión o un tipo de cocina, sigue teniéndolo en cuenta en tus siguientes respuestas aunque la persona no lo repita (por ejemplo, si preguntó por "algo picante" y luego dice "¿y más barato?", sigue buscando algo picante Y barato a la vez, no solo lo último). Si un mensaje combina varias condiciones a la vez (cocina, precio, alergia, ocasión, zona...), respóndelas todas juntas, no una sola.';
     if(ctx){
       system+=`\n\nDatos reales de OpenStreetMap para "${ctx.place}" (úsalos como base de tu respuesta, son restaurantes que existen de verdad; no inventes otros si estos cubren lo que pide el usuario):\n${ctx.listing}`;
     } else {
