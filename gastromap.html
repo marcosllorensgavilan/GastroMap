@@ -1577,7 +1577,18 @@ async function fetchOSMCity(city,limit){
   if(!geoData.length) throw new Error('Ciudad no encontrada');
   const {lat,lon,boundingbox} = geoData[0];
   const [s,n,w,e] = boundingbox.map(Number);
-  const places = await fetchOSMBBox(s,n,w,e,null,null,limit);
+  let places = await fetchOSMBBox(s,n,w,e,null,null,limit);
+  // Si el pueblo/barrio en concreto casi no tiene datos (habitual en
+  // localidades pequeñas, donde poca gente ha cartografiado restaurantes),
+  // ampliamos la búsqueda a su alrededor en vez de rendirnos con casi nada
+  // — así "cerca de Godella" también puede encontrar sitios de zonas
+  // colindantes, en vez de depender de que Godella en sí tenga muchos.
+  if(places.length<5){
+    const latNum=parseFloat(lat), lonNum=parseFloat(lon);
+    const buffer=0.15; // ~15km, razonable para "cerca de" un pueblo pequeño
+    const wider=await fetchOSMBBox(latNum-buffer,latNum+buffer,lonNum-buffer,lonNum+buffer,null,null,limit).catch(()=>places);
+    if(wider.length>places.length) places=wider;
+  }
   return {places,lat,lon,bbox:[s,n,w,e]};
 }
 
@@ -3413,10 +3424,23 @@ let botLastLocation=null; // recuerda la última ciudad detectada en esta conver
 let botLastCuisineMatches=null; // recuerda el último filtro de cocina/plato mencionado, para que preguntas de seguimiento no lo pierdan
 function extractLocationCandidates(text){
   const candidates=[];
-  // 1) Palabras con mayúscula tras "en"/"in" (lo más fiable: "en Denia", "en Nueva York")
-  const capRe=/\b(?:en|in)\s+([A-ZÀ-Ý][a-zà-ÿ]*(?:\s+(?:de\s+|del\s+)?[A-ZÀ-Ý][a-zà-ÿ]*)*)/g;
+  // 1) Palabras con mayúscula tras una preposición de lugar habitual: "en
+  //    Denia", "cerca de Godella", "por Paterna", "junto a Alboraya"...
+  //    Antes solo reconocía "en/in", así que frases tan normales como
+  //    "cerca de Godella" no detectaban ningún pueblo en absoluto.
+  const capRe=/\b(?:en|in|cerca de|cerca del|por|junto a|alrededor de|hacia|desde)\s+([A-ZÀ-Ý][a-zà-ÿ]*(?:\s+(?:de\s+|del\s+)?[A-ZÀ-Ý][a-zà-ÿ]*)*)/g;
   let m;
-  while((m=capRe.exec(text))!==null) candidates.push(m[1].trim());
+  while((m=capRe.exec(text))!==null){
+    const place=m[1].trim();
+    candidates.push(place);
+    // Si justo después viene " o " / " y " seguido de otra palabra con
+    // mayúscula, es casi seguro un segundo lugar mencionado a la vez
+    // ("Godella o Paterna") — lo añadimos también como candidato.
+    const rest=text.slice(capRe.lastIndex);
+    const secondRe=/^\s*(?:o|y)\s+([A-ZÀ-Ý][a-zà-ÿ]*(?:\s+(?:de\s+|del\s+)?[A-ZÀ-Ý][a-zà-ÿ]*)*)/;
+    const second=rest.match(secondRe);
+    if(second) candidates.push(second[1].trim());
+  }
   // 2) Respaldo: todo lo que sigue a "en " hasta puntuación, por si la ciudad no llevaba mayúscula
   const looseRe=/\b(?:en|in)\s+([a-zA-ZÀ-ÿ0-9\s,.'-]{3,40}?)(?:[.,!?]|$)/i;
   const loose=text.match(looseRe);
@@ -3703,11 +3727,11 @@ async function sendBot(){
   try{
     // Busca en OpenStreetMap si el mensaje menciona una zona, para responder con sitios reales
     const ctx=await findLocationContext(text);
-    let system=GASTROMAP_EXPERT_PROMPT+'\n\nEres GastroBot dentro de la app GastroMap. Usa emojis de comida de forma natural. Escribe en párrafos cortos y conversacionales, con como mucho un par de negritas para lo más importante. IMPORTANTE sobre los nombres: cuando recomiendes un restaurante concreto de la lista de datos reales, escribe su nombre EXACTAMENTE igual que aparece en esa lista (mismas mayúsculas, tildes y todo) al menos una vez en tu respuesta — la app detecta esos nombres en tu texto para mostrar automáticamente su tarjeta con foto justo debajo, así que si no escribes el nombre tal cual, no se le mostrará su tarjeta a la persona. No hace falta que repitas cada nombre varias veces, con una vez basta. Ten en cuenta TODO el hilo de la conversación, no solo el último mensaje: si antes se mencionó una alergia, un presupuesto, una ocasión o un tipo de cocina, sigue teniéndolo en cuenta en tus siguientes respuestas aunque la persona no lo repita (por ejemplo, si preguntó por "algo picante" y luego dice "¿y más barato?", sigue buscando algo picante Y barato a la vez, no solo lo último). Si un mensaje combina varias condiciones a la vez (cocina, precio, alergia, ocasión, zona...), respóndelas todas juntas, no una sola.';
+    let system=GASTROMAP_EXPERT_PROMPT+'\n\nEres GastroBot dentro de la app GastroMap. Usa emojis de comida de forma natural. Escribe en párrafos cortos y conversacionales, con como mucho un par de negritas para lo más importante. IMPORTANTE sobre los nombres: cuando recomiendes un restaurante concreto de la lista de datos reales, escribe su nombre EXACTAMENTE igual que aparece en esa lista (mismas mayúsculas, tildes y todo) al menos una vez en tu respuesta — la app detecta esos nombres en tu texto para mostrar automáticamente su tarjeta con foto justo debajo. No hace falta que repitas cada nombre varias veces, con una vez basta. Esto es un detalle interno de funcionamiento — NUNCA se lo expliques a la persona, ni le digas que "esto generaría una tarjeta", ni te disculpes por no poder mostrarle una tarjeta, ni menciones de ninguna forma que existen tarjetas, fotos o este mecanismo. Simplemente responde con normalidad, como lo haría cualquier persona que conoce bien de restaurantes. Ten en cuenta TODO el hilo de la conversación, no solo el último mensaje: si antes se mencionó una alergia, un presupuesto, una ocasión o un tipo de cocina, sigue teniéndolo en cuenta en tus siguientes respuestas aunque la persona no lo repita (por ejemplo, si preguntó por "algo picante" y luego dice "¿y más barato?", sigue buscando algo picante Y barato a la vez, no solo lo último). Si un mensaje combina varias condiciones a la vez (cocina, precio, alergia, ocasión, zona...), respóndelas todas juntas, no una sola.';
     if(ctx){
       system+=`\n\nDatos reales de OpenStreetMap para "${ctx.place}" (úsalos como base de tu respuesta, son restaurantes que existen de verdad; no inventes otros si estos cubren lo que pide el usuario):\n${ctx.listing}`;
     } else {
-      system+='\n\nNo tienes datos verificados de OpenStreetMap para esta consulta. Puedes recomendar por tu conocimiento general con normalidad, pero si das nombres de restaurantes concretos, añade una única frase breve al final invitando a confirmar que sigue abierto antes de ir — sin repetir el aviso varias veces, sin sonar inseguro, y sin recomendar ninguna otra app o servicio de terceros.';
+      system+='\n\nNo tienes datos verificados de OpenStreetMap para esta consulta. Puedes recomendar por tu conocimiento general con normalidad, pero si das nombres de restaurantes concretos, añade una única frase breve al final invitando a confirmar que sigue abierto antes de ir — sin repetir el aviso varias veces, sin sonar inseguro, sin recomendar ninguna otra app o servicio de terceros, y sin explicar por qué no tienes datos verificados ni mencionar nada sobre tarjetas, fotos o el funcionamiento interno de la app. Responde con la misma naturalidad y confianza que si sí tuvieras los datos.';
     }
     const reply=await callClaude({system, messages:botHistory, max_tokens:1500});
     document.getElementById(typingId)?.remove();
