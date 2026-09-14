@@ -967,9 +967,7 @@ a{text-decoration:none;color:inherit}
   <div class="bot-layout">
     <div class="bot-sidebar">
       <button class="bot-new-btn" onclick="newBotChat()">+ Nueva consulta</button>
-      <div id="bot-history">
-        <div class="bot-history-item active">Nueva consulta</div>
-      </div>
+      <div id="bot-history"></div>
     </div>
     <div class="bot-main">
       <div class="bot-header">
@@ -1300,6 +1298,7 @@ function showPage(id) {
   if(id==='mapa' && !leafletMap) initMap();
   if(id==='tendencias') renderTrending();
   if(id==='listas') renderLists();
+  if(id==='gastrobot') loadBotConversations();
   if(id==='creadores') renderCreators();
   if(id==='ia' && !iaDefaultsApplied){ applyDefaultAllergiesToForm('ia-alergias'); iaDefaultsApplied=true; }
   if(id==='viajero' && !viajeroDefaultsApplied){ applyDefaultAllergiesToForm('viajero-alergias'); viajeroDefaultsApplied=true; }
@@ -2609,6 +2608,7 @@ function showPageDirect(id){
   const map={'explorar':0,'mapa':1,'tendencias':2,'listas':3,'ia':4,'creadores':5,'viajero':6,'gastrobot':7,'ajustes':8};
   if(links[map[id]]) links[map[id]].classList.add('active');
   if(id==='mapa' && !leafletMap) initMap();
+  if(id==='gastrobot') loadBotConversations();
   if(id==='perfil') renderPerfil();
 }
 function openProfileOrLogin(){
@@ -3614,10 +3614,13 @@ function openRestaurantFromIA(r){
 // ═══════════════════════════════════════════════════════════
 // GASTROBOT
 // ═══════════════════════════════════════════════════════════
+let currentBotConversationId=null; // null = conversación nueva, todavía sin guardar
+let botConversationsCache={};
 function newBotChat(){
   botHistory=[];
   botLastLocation=null;
   botLastCuisineMatches=null;
+  currentBotConversationId=null;
   document.getElementById('bot-messages').innerHTML=`<div class="bot-empty" id="bot-empty">
     <div class="bot-empty-icon">🍽</div>
     <div class="bot-empty-title">GastroBot a tu servicio</div>
@@ -3629,6 +3632,56 @@ function newBotChat(){
       <button class="bot-sugg" onclick="sendBotSugg(this)">Recomiéndame sushi en Barcelona</button>
     </div>
   </div>`;
+  renderBotSidebar();
+}
+// Las conversaciones se guardan en tu cuenta (no en el dispositivo), igual
+// que favoritos y listas — así no desaparecen al recargar la página ni
+// cambian entre el móvil y el ordenador.
+async function loadBotConversations(){
+  if(!currentUser){ botConversationsCache={}; renderBotSidebar(); return; }
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/bot-conversations/mine`,{headers:{'Authorization':'Bearer '+authToken}});
+    const data=await resp.json();
+    botConversationsCache={};
+    (data.conversations||[]).forEach(c=>botConversationsCache[c.id]=c);
+  }catch(e){/* si falla, se queda solo con "nueva consulta" */}
+  renderBotSidebar();
+}
+function renderBotSidebar(){
+  const hi=document.getElementById('bot-history');
+  if(!hi) return;
+  const convos=Object.values(botConversationsCache).sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
+  hi.innerHTML=`<div class="bot-history-item${currentBotConversationId?'':' active'}" onclick="newBotChat()">+ Nueva consulta</div>`+
+    convos.map(c=>`<div class="bot-history-item${c.id===currentBotConversationId?' active':''}" onclick="openBotConversation(${c.id})">${c.title}</div>`).join('');
+}
+function openBotConversation(id){
+  const convo=botConversationsCache[id];
+  if(!convo) return;
+  currentBotConversationId=id;
+  botHistory=convo.messages;
+  botLastLocation=null; // se detectará de nuevo si hace falta seguir preguntando sobre esa ciudad
+  botLastCuisineMatches=null;
+  const msgs=document.getElementById('bot-messages');
+  msgs.innerHTML='';
+  botHistory.forEach(m=>appendMsg(m.role==='user'?'user':'bot', m.content));
+  renderBotSidebar();
+}
+async function saveBotConversation(){
+  if(!currentUser) return; // los invitados no guardan (no hay cuenta donde guardarlo)
+  try{
+    if(currentBotConversationId){
+      await fetch(`${LOCAL_DB_URL}/api/bot-conversations/${currentBotConversationId}`,{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({messages:botHistory})});
+      if(botConversationsCache[currentBotConversationId]) botConversationsCache[currentBotConversationId].messages=botHistory;
+    }else{
+      const firstUserMsg=botHistory.find(m=>m.role==='user');
+      const title=(firstUserMsg?.content||'Consulta').slice(0,40)+((firstUserMsg?.content||'').length>40?'…':'');
+      const resp=await fetch(`${LOCAL_DB_URL}/api/bot-conversations`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({title,messages:botHistory})});
+      const data=await resp.json();
+      currentBotConversationId=data.id;
+      botConversationsCache[data.id]={id:data.id,title,messages:botHistory,updated_at:new Date().toISOString()};
+    }
+    renderBotSidebar();
+  }catch(e){/* si falla el guardado, la conversación sigue funcionando igual en pantalla, solo que no queda guardada esta vez */}
 }
 function sendBotSugg(btn){document.getElementById('bot-input').value=btn.textContent;sendBot();}
 async function sendBot(){
@@ -3660,13 +3713,7 @@ async function sendBot(){
     document.getElementById(typingId)?.remove();
     appendMsg('bot',reply,ctx?ctx.places:null);
     botHistory.push({role:'assistant',content:reply});
-    const hi=document.getElementById('bot-history');
-    if(botHistory.length===2){
-      const item=document.createElement('div');
-      item.className='bot-history-item';
-      item.textContent=text.slice(0,30)+(text.length>30?'…':'');
-      hi.appendChild(item);
-    }
+    saveBotConversation();
   }catch(e){
     document.getElementById(typingId)?.remove();
     appendMsg('bot',e.message||'Lo siento, no pude conectarme en este momento. Por favor intenta de nuevo.');
@@ -3701,7 +3748,18 @@ function renderMarkdown(text){
 let botCardPlaces={};
 function botRestaurantCards(places){
   if(!places||!places.length) return '';
-  const top=places.slice(0,4);
+  // Antes cogía siempre los 4 primeros literales — como la puntuación es
+  // siempre la misma para cada nombre, eso significaba ver siempre los
+  // mismos 4 sitios en una ciudad, sin importar qué preguntaras. Ahora
+  // elegimos al azar entre los 12 mejores, para que haya variedad real
+  // entre una consulta y otra, sin dejar de ser buenos candidatos.
+  const wide=places.slice(0,12);
+  const top=[];
+  const pool=[...wide];
+  while(top.length<4 && pool.length){
+    const i=Math.floor(Math.random()*pool.length);
+    top.push(pool.splice(i,1)[0]);
+  }
   top.forEach(p=>botCardPlaces[p.id]=p);
   return `<div class="bot-cards">${top.map(p=>`
     <div class="bot-card" onclick="openBotCard('${p.id}')">

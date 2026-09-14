@@ -136,6 +136,13 @@ appDb.exec(`
     created_at TEXT NOT NULL,
     PRIMARY KEY (user_id, list_index)
   );
+  CREATE TABLE IF NOT EXISTS bot_conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    messages TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
 `);
 // Estas dos columnas se añadieron después del lanzamiento — ALTER TABLE con
 // comprobación, para que no falle en instalaciones que ya tenían la tabla
@@ -506,6 +513,36 @@ app.delete('/api/saved-lists/:index', requireAuth, (req, res) => {
 app.delete('/api/saved-lists/mine/all', requireAuth, (req, res) => {
   const info = appDb.prepare('DELETE FROM saved_lists WHERE user_id = ?').run(req.user.id);
   res.json({ ok: true, deleted: info.changes });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// CONVERSACIONES DE GASTROBOT — guardadas en la cuenta, no en el
+// dispositivo, para que no se pierdan al recargar la página ni cambien
+// entre el móvil y el ordenador.
+// ═══════════════════════════════════════════════════════════════
+app.get('/api/bot-conversations/mine', requireAuth, (req, res) => {
+  const rows = appDb.prepare('SELECT id, title, messages, updated_at FROM bot_conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT 50').all(req.user.id);
+  res.json({ conversations: rows.map(r => ({ id: r.id, title: r.title, messages: JSON.parse(r.messages), updated_at: r.updated_at })) });
+});
+app.post('/api/bot-conversations', requireAuth, (req, res) => {
+  const { title, messages } = req.body || {};
+  if (!title || !Array.isArray(messages)) return res.status(400).json({ error: 'Faltan datos de la conversación.' });
+  const info = appDb.prepare('INSERT INTO bot_conversations (user_id, title, messages, updated_at) VALUES (?,?,?,?)')
+    .run(req.user.id, String(title).slice(0, 60), JSON.stringify(messages), new Date().toISOString());
+  res.json({ ok: true, id: info.lastInsertRowid });
+});
+app.put('/api/bot-conversations/:id', requireAuth, (req, res) => {
+  const { messages } = req.body || {};
+  if (!Array.isArray(messages)) return res.status(400).json({ error: 'Faltan los mensajes.' });
+  const convo = appDb.prepare('SELECT id FROM bot_conversations WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!convo) return res.status(404).json({ error: 'Conversación no encontrada.' });
+  appDb.prepare('UPDATE bot_conversations SET messages = ?, updated_at = ? WHERE id = ?')
+    .run(JSON.stringify(messages), new Date().toISOString(), req.params.id);
+  res.json({ ok: true });
+});
+app.delete('/api/bot-conversations/:id', requireAuth, (req, res) => {
+  appDb.prepare('DELETE FROM bot_conversations WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+  res.json({ ok: true });
 });
 
 app.get('/api/users/:id/followers', (req, res) => {
