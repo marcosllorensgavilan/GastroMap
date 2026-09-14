@@ -3703,7 +3703,7 @@ async function sendBot(){
   try{
     // Busca en OpenStreetMap si el mensaje menciona una zona, para responder con sitios reales
     const ctx=await findLocationContext(text);
-    let system=GASTROMAP_EXPERT_PROMPT+'\n\nEres GastroBot dentro de la app GastroMap. Usa emojis de comida de forma natural. Escribe en párrafos cortos y conversacionales, con como mucho un par de negritas para lo más importante — evita listas largas con muchos guiones, porque los sitios concretos que menciones ya se muestran aparte como tarjetas con foto, así que no hace falta que los repitas todos en el texto uno por uno. Ten en cuenta TODO el hilo de la conversación, no solo el último mensaje: si antes se mencionó una alergia, un presupuesto, una ocasión o un tipo de cocina, sigue teniéndolo en cuenta en tus siguientes respuestas aunque la persona no lo repita (por ejemplo, si preguntó por "algo picante" y luego dice "¿y más barato?", sigue buscando algo picante Y barato a la vez, no solo lo último). Si un mensaje combina varias condiciones a la vez (cocina, precio, alergia, ocasión, zona...), respóndelas todas juntas, no una sola.';
+    let system=GASTROMAP_EXPERT_PROMPT+'\n\nEres GastroBot dentro de la app GastroMap. Usa emojis de comida de forma natural. Escribe en párrafos cortos y conversacionales, con como mucho un par de negritas para lo más importante. IMPORTANTE sobre los nombres: cuando recomiendes un restaurante concreto de la lista de datos reales, escribe su nombre EXACTAMENTE igual que aparece en esa lista (mismas mayúsculas, tildes y todo) al menos una vez en tu respuesta — la app detecta esos nombres en tu texto para mostrar automáticamente su tarjeta con foto justo debajo, así que si no escribes el nombre tal cual, no se le mostrará su tarjeta a la persona. No hace falta que repitas cada nombre varias veces, con una vez basta. Ten en cuenta TODO el hilo de la conversación, no solo el último mensaje: si antes se mencionó una alergia, un presupuesto, una ocasión o un tipo de cocina, sigue teniéndolo en cuenta en tus siguientes respuestas aunque la persona no lo repita (por ejemplo, si preguntó por "algo picante" y luego dice "¿y más barato?", sigue buscando algo picante Y barato a la vez, no solo lo último). Si un mensaje combina varias condiciones a la vez (cocina, precio, alergia, ocasión, zona...), respóndelas todas juntas, no una sola.';
     if(ctx){
       system+=`\n\nDatos reales de OpenStreetMap para "${ctx.place}" (úsalos como base de tu respuesta, son restaurantes que existen de verdad; no inventes otros si estos cubren lo que pide el usuario):\n${ctx.listing}`;
     } else {
@@ -3746,20 +3746,18 @@ function renderMarkdown(text){
 // Tarjetas con foto de restaurantes reales (de OpenStreetMap) para acompañar
 // la respuesta de texto — así GastroBot no solo describe, también enseña.
 let botCardPlaces={};
-function botRestaurantCards(places){
-  if(!places||!places.length) return '';
-  // Antes cogía siempre los 4 primeros literales — como la puntuación es
-  // siempre la misma para cada nombre, eso significaba ver siempre los
-  // mismos 4 sitios en una ciudad, sin importar qué preguntaras. Ahora
-  // elegimos al azar entre los 12 mejores, para que haya variedad real
-  // entre una consulta y otra, sin dejar de ser buenos candidatos.
-  const wide=places.slice(0,12);
-  const top=[];
-  const pool=[...wide];
-  while(top.length<4 && pool.length){
-    const i=Math.floor(Math.random()*pool.length);
-    top.push(pool.splice(i,1)[0]);
-  }
+function botRestaurantCards(places,replyText){
+  if(!places||!places.length||!replyText) return '';
+  // Las tarjetas ahora son EXACTAMENTE los restaurantes que la IA menciona
+  // por nombre en su respuesta — antes eran una selección aparte (al azar
+  // entre los mejor puntuados) que no tenía por qué coincidir con lo que
+  // el texto decía, así que texto e imágenes podían no tener nada que ver.
+  // Como se basa en lo que la IA elige mencionar (no en la puntuación), ya
+  // no sale siempre el mismo top de 9.9 — puede mencionar cualquiera.
+  const lowerText=replyText.toLowerCase();
+  const mentioned=places.filter(p=>p.name && lowerText.includes(p.name.toLowerCase()));
+  if(!mentioned.length) return '';
+  const top=mentioned.slice(0,6);
   top.forEach(p=>botCardPlaces[p.id]=p);
   return `<div class="bot-cards">${top.map(p=>`
     <div class="bot-card" onclick="openBotCard('${p.id}')">
@@ -3777,7 +3775,7 @@ function appendMsg(role,text,places){
   const div=document.createElement('div');
   div.className='msg-row '+role;
   const body=role==='bot'?renderMarkdown(text):text.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-  const cards=role==='bot'?botRestaurantCards(places):'';
+  const cards=role==='bot'?botRestaurantCards(places,text):'';
   div.innerHTML=`<div class="msg-ava ${role}">${role==='bot'?'🍽':'M'}</div><div class="msg-bubble ${role}">${body}${cards}</div>`;
   msgs.appendChild(div);
   msgs.scrollTop=msgs.scrollHeight;
