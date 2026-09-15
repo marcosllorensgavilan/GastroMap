@@ -150,6 +150,8 @@ appDb.exec(`
 const userCols = appDb.prepare("PRAGMA table_info(users)").all().map(c => c.name);
 if (!userCols.includes('avatar_url')) appDb.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT');
 if (!userCols.includes('bio')) appDb.exec('ALTER TABLE users ADD COLUMN bio TEXT');
+const reviewCols = appDb.prepare("PRAGMA table_info(reviews)").all().map(c => c.name);
+if (!reviewCols.includes('photo_url')) appDb.exec('ALTER TABLE reviews ADD COLUMN photo_url TEXT');
 console.log(`💾 Base de datos de la app (usuarios/reseñas) en: ${APP_DB_PATH}`);
 
 // Carpeta para fotos de perfil y vídeos subidos por usuarios — dentro de
@@ -158,7 +160,8 @@ console.log(`💾 Base de datos de la app (usuarios/reseñas) en: ${APP_DB_PATH}
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars');
 const VIDEOS_DIR = path.join(UPLOADS_DIR, 'videos');
-[UPLOADS_DIR, AVATARS_DIR, VIDEOS_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+const REVIEW_PHOTOS_DIR = path.join(UPLOADS_DIR, 'review-photos');
+[UPLOADS_DIR, AVATARS_DIR, VIDEOS_DIR, REVIEW_PHOTOS_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 function makeUploader(dir, allowedMimePrefix, maxSizeMB) {
@@ -179,6 +182,45 @@ function makeUploader(dir, allowedMimePrefix, maxSizeMB) {
 }
 const uploadAvatar = makeUploader(AVATARS_DIR, 'image/', 8);
 const uploadVideo = makeUploader(VIDEOS_DIR, 'video/', 100);
+const uploadReviewPhoto = makeUploader(REVIEW_PHOTOS_DIR, 'image/', 8);
+
+// Moderación de la foto de una reseña — misma idea que con los vídeos, pero
+// más simple: la propia foto subida ya es la imagen a analizar, no hace
+// falta extraer un fotograma con ffmpeg primero.
+async function moderateReviewPhoto(photoPath) {
+  if (!ANTHROPIC_API_KEY) return { ok: true };
+  try {
+    const ext = path.extname(photoPath).toLowerCase();
+    const mediaType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+    const base64 = fs.readFileSync(photoPath).toString('base64');
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 200,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            { type: 'text', text: 'Analiza esta imagen (una foto subida junto a una reseña de restaurante en GastroMap). Responde SOLO con este JSON, sin nada más: {"food_related": true o false, "appropriate": true o false, "reason": "breve explicación en español, solo si alguno de los dos es false"}. food_related debe ser true si la imagen muestra comida, un plato, un restaurante, una cocina, una bebida, un ingrediente, o cualquier cosa claramente relacionada con gastronomía. appropriate debe ser false si hay contenido sexual, violento, gráfico o inapropiado para todos los públicos.' }
+          ]
+        }]
+      })
+    });
+    const data = await resp.json();
+    const textBlock = (data.content || []).find(b => b.type === 'text');
+    if (!textBlock) return { ok: true };
+    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : textBlock.text);
+    if (parsed.appropriate === false) return { ok: false, reason: parsed.reason || 'El contenido no parece apropiado para GastroMap.' };
+    if (parsed.food_related === false) return { ok: false, reason: parsed.reason || 'GastroMap solo admite fotos relacionadas con comida y restaurantes.' };
+    return { ok: true };
+  } catch (e) {
+    console.warn('⚠️  No se pudo moderar la foto de la reseña automáticamente:', e.message);
+    return { ok: true };
+  }
+}
 
 // Moderación de contenido: extrae un fotograma del vídeo y le pide a Claude
 // que compruebe que es contenido de comida/restaurantes y apropiado, antes
@@ -325,7 +367,7 @@ app.get('/api/reviews', (req, res) => {
   const restaurantId = String(req.query.restaurant_id || '');
   if (!restaurantId) return res.status(400).json({ error: 'Falta restaurant_id.' });
   const rows = appDb.prepare(`
-    SELECT reviews.id, reviews.rating, reviews.text, reviews.created_at, users.id as user_id, users.name as user_name, users.avatar_url as user_avatar
+    SELECT reviews.id, reviews.rating, reviews.text, reviews.photo_url, reviews.created_at, users.id as user_id, users.name as user_name, users.avatar_url as user_avatar
     FROM reviews JOIN users ON users.id = reviews.user_id
     WHERE restaurant_id = ?
     ORDER BY reviews.created_at DESC
@@ -334,14 +376,27 @@ app.get('/api/reviews', (req, res) => {
 });
 
 app.post('/api/reviews', requireAuth, (req, res) => {
-  const { restaurant_id, restaurant_name, rating, text } = req.body || {};
-  if (!restaurant_id || !restaurant_name || !rating || !text) {
-    return res.status(400).json({ error: 'Faltan datos de la reseña.' });
-  }
-  const r = Math.max(1, Math.min(5, parseInt(rating, 10) || 0));
-  appDb.prepare('INSERT INTO reviews (user_id, restaurant_id, restaurant_name, rating, text, created_at) VALUES (?,?,?,?,?,?)')
-    .run(req.user.id, String(restaurant_id), restaurant_name, r, String(text).slice(0, 2000), new Date().toISOString());
-  res.json({ ok: true });
+  uploadReviewPhoto.single('photo')(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    const { restaurant_id, restaurant_name, rating, text } = req.body || {};
+    if (!restaurant_id || !restaurant_name || !rating || !text) {
+      if (req.file) { try { fs.unlinkSync(req.file.path); } catch (e) {/* nada que hacer si ya no está */} }
+      return res.status(400).json({ error: 'Faltan datos de la reseña.' });
+    }
+    let photo_url = null;
+    if (req.file) {
+      const moderation = await moderateReviewPhoto(req.file.path);
+      if (!moderation.ok) {
+        try { fs.unlinkSync(req.file.path); } catch (e) {/* nada que hacer si ya no está */}
+        return res.status(400).json({ error: '🚫 ' + moderation.reason });
+      }
+      photo_url = `/uploads/review-photos/${req.file.filename}`;
+    }
+    const r = Math.max(1, Math.min(5, parseInt(rating, 10) || 0));
+    appDb.prepare('INSERT INTO reviews (user_id, restaurant_id, restaurant_name, rating, text, photo_url, created_at) VALUES (?,?,?,?,?,?,?)')
+      .run(req.user.id, String(restaurant_id), restaurant_name, r, String(text).slice(0, 2000), photo_url, new Date().toISOString());
+    res.json({ ok: true, photo_url });
+  });
 });
 
 app.get('/api/reviews/mine', requireAuth, (req, res) => {
@@ -351,7 +406,7 @@ app.get('/api/reviews/mine', requireAuth, (req, res) => {
 
 app.get('/api/reviews/mine/list', requireAuth, (req, res) => {
   const rows = appDb.prepare(`
-    SELECT id, restaurant_id, restaurant_name, rating, text, created_at
+    SELECT id, restaurant_id, restaurant_name, rating, text, photo_url, created_at
     FROM reviews WHERE user_id = ? ORDER BY created_at DESC
   `).all(req.user.id);
   res.json({ reviews: rows });
@@ -461,7 +516,7 @@ app.get('/api/users/:id/public', (req, res) => {
   if (req.user) {
     isFollowing = !!appDb.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?').get(req.user.id, id);
   }
-  const reviews = appDb.prepare('SELECT id, restaurant_id, restaurant_name, rating, text, created_at FROM reviews WHERE user_id = ? ORDER BY created_at DESC').all(id);
+  const reviews = appDb.prepare('SELECT id, restaurant_id, restaurant_name, rating, text, photo_url, created_at FROM reviews WHERE user_id = ? ORDER BY created_at DESC').all(id);
   const videos = appDb.prepare('SELECT id, video_url, caption, location, created_at FROM user_videos WHERE user_id = ? ORDER BY created_at DESC').all(id)
     .map(v => {
       const likeCount = appDb.prepare('SELECT COUNT(*) c FROM video_likes WHERE video_id = ?').get(v.id).c;

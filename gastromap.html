@@ -2314,6 +2314,7 @@ async function renderMyReviews(){
           <span>${starRatingHTML(r.rating)}</span>
         </div>
         <div style="font-size:13px;color:var(--textm);line-height:1.5;margin-bottom:6px">${r.text}</div>
+        ${r.photo_url?`<img src="${LOCAL_DB_URL}${r.photo_url}" onclick="openImageLightbox('${LOCAL_DB_URL}${r.photo_url}')" style="max-width:160px;border-radius:10px;display:block;margin-bottom:6px;cursor:pointer">`:''}
         <div style="font-size:11px;color:var(--textl)">${new Date(r.created_at).toLocaleDateString('es-ES')}</div>
       </div>`).join('');
   }catch(e){
@@ -2804,12 +2805,32 @@ function renderReviewForm(){
     return;
   }
   selectedReviewStars=0;
+  selectedReviewPhoto=null;
   area.innerHTML=`
     <h3>Deja tu reseña</h3>
     <div class="star-select" id="review-stars">${[1,2,3,4,5].map(n=>`<span onclick="setReviewStars(${n})" onmouseover="hoverReviewStars(${n})" onmouseout="hoverReviewStars(0)">${starSVG(false,22)}</span>`).join('')}</div>
     <div class="ia-field"><textarea class="ia-input" id="review-text" rows="3" placeholder="Comparte tu experiencia…"></textarea></div>
+    <div id="review-photo-preview" style="display:none;margin-bottom:10px;position:relative;max-width:160px">
+      <img id="review-photo-preview-img" style="width:100%;border-radius:10px;display:block">
+      <button onclick="removeReviewPhoto()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer">×</button>
+    </div>
+    <input type="file" id="review-photo-input" accept="image/*" style="display:none" onchange="onReviewPhotoSelected(this.files[0])">
+    <button type="button" onclick="document.getElementById('review-photo-input').click()" style="background:none;border:1px dashed var(--g3);color:var(--textm);border-radius:10px;padding:8px 14px;font-size:12.5px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;gap:6px">📷 Añadir foto (opcional)</button>
     <button class="btn-ia" onclick="submitReview()">➤ Publicar Reseña</button>
   `;
+}
+let selectedReviewPhoto=null;
+function onReviewPhotoSelected(file){
+  if(!file) return;
+  selectedReviewPhoto=file;
+  const preview=document.getElementById('review-photo-preview');
+  document.getElementById('review-photo-preview-img').src=URL.createObjectURL(file);
+  preview.style.display='block';
+}
+function removeReviewPhoto(){
+  selectedReviewPhoto=null;
+  document.getElementById('review-photo-input').value='';
+  document.getElementById('review-photo-preview').style.display='none';
 }
 async function submitReview(){
   if(!currentUser){ showLoginPrompt('Inicia sesión o regístrate para publicar reseñas.'); return; }
@@ -2818,11 +2839,17 @@ async function submitReview(){
   if(selectedReviewStars<1){ alert('Elige una puntuación de estrellas.'); return; }
   const text=(document.getElementById('review-text').value||'').trim();
   if(!text){ alert('Escribe algo sobre tu experiencia.'); return; }
+  const fd=new FormData();
+  fd.append('restaurant_id',String(d.id));
+  fd.append('restaurant_name',d.name);
+  fd.append('rating',selectedReviewStars);
+  fd.append('text',text);
+  if(selectedReviewPhoto) fd.append('photo',selectedReviewPhoto);
   try{
     const resp=await fetch(`${LOCAL_DB_URL}/api/reviews`,{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
-      body:JSON.stringify({restaurant_id:String(d.id),restaurant_name:d.name,rating:selectedReviewStars,text})
+      headers:{'Authorization':'Bearer '+authToken},
+      body:fd
     });
     const data=await resp.json();
     if(!resp.ok){ alert(data.error||'No se pudo publicar la reseña.'); return; }
@@ -2849,10 +2876,11 @@ async function loadReviews(restaurantId){
     list.innerHTML=reviews.map(r=>`
       <div class="review-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <strong style="cursor:pointer" onclick="openPublicProfile(${r.user_id})">${r.user_avatar?`<img src="${r.user_avatar}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:-5px;margin-right:6px">`:''}${r.user_name}</strong>
+          <strong style="cursor:pointer" onclick="openPublicProfile(${r.user_id})">${r.user_avatar?`<img src="${LOCAL_DB_URL}${r.user_avatar}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:-5px;margin-right:6px">`:''}${r.user_name}</strong>
           <span>${starRatingHTML(r.rating)}</span>
         </div>
         <div style="font-size:13px;color:var(--textm);line-height:1.5;margin-bottom:6px">${r.text}</div>
+        ${r.photo_url?`<img src="${LOCAL_DB_URL}${r.photo_url}" onclick="openImageLightbox('${LOCAL_DB_URL}${r.photo_url}')" style="max-width:160px;border-radius:10px;display:block;margin-bottom:6px;cursor:pointer">`:''}
         <div style="font-size:11px;color:var(--textl)">${new Date(r.created_at).toLocaleDateString('es-ES')}</div>
       </div>`).join('');
   }catch(e){
@@ -3304,6 +3332,7 @@ async function openPublicProfile(userId){
           <strong>${r.restaurant_name}</strong><span>${starRatingHTML(r.rating)}</span>
         </div>
         <div style="font-size:13px;color:var(--textm);line-height:1.5">${r.text}</div>
+        ${r.photo_url?`<img src="${LOCAL_DB_URL}${r.photo_url}" onclick="openImageLightbox('${LOCAL_DB_URL}${r.photo_url}')" style="max-width:160px;border-radius:10px;display:block;margin-top:6px;cursor:pointer">`:''}
       </div>`).join(''):'<div style="font-size:13px;color:var(--textl)">Sin recomendaciones todavía.</div>';
     body.innerHTML=`
       <div style="text-align:center;margin-bottom:20px">
