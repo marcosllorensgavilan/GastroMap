@@ -1062,22 +1062,28 @@ a{text-decoration:none;color:inherit}
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--g2)">
       <button onclick="closeVideoUploadModal()" style="background:none;border:none;color:var(--textl);font-size:14px;cursor:pointer;padding:0">Cancelar</button>
       <div style="font-weight:700;font-size:14px">Nueva publicación</div>
-      <button id="video-upload-submit-btn" onclick="submitVideoUpload()" style="background:none;border:none;color:var(--orange);font-weight:700;font-size:14px;cursor:pointer;padding:0;display:none">Publicar</button>
+      <button id="video-upload-submit-btn" onclick="submitUpload()" style="background:none;border:none;color:var(--orange);font-weight:700;font-size:14px;cursor:pointer;padding:0;display:none">Publicar</button>
     </div>
-    <div id="video-upload-picker" style="padding:56px 20px;text-align:center">
-      <div style="font-size:40px;margin-bottom:14px">🎬</div>
-      <div style="font-size:14px;color:var(--textm);margin-bottom:18px">Selecciona un vídeo de tu galería</div>
-      <button class="btn-ia" style="width:auto;padding:10px 24px" onclick="document.getElementById('video-upload-file-input').click()">Elegir vídeo</button>
+    <div id="upload-choose-type" style="padding:50px 20px;text-align:center">
+      <div style="font-size:14px;color:var(--textm);margin-bottom:20px">¿Qué quieres subir?</div>
+      <div style="display:flex;gap:12px;justify-content:center">
+        <button class="btn-ia" style="width:auto;padding:12px 22px" onclick="document.getElementById('video-upload-file-input').click()">🎬 Vídeo</button>
+        <button class="btn-ia" style="width:auto;padding:12px 22px" onclick="document.getElementById('photo-upload-file-input').click()">📷 Fotos</button>
+      </div>
       <input type="file" id="video-upload-file-input" accept="video/*" style="display:none" onchange="onVideoFileSelected(this.files[0])">
+      <input type="file" id="photo-upload-file-input" accept="image/*" multiple style="display:none" onchange="onPhotosSelected(this.files)">
     </div>
     <div id="video-upload-details" style="display:none">
       <video id="video-upload-preview" style="width:100%;max-height:320px;background:#000;display:block;object-fit:contain" controls></video>
+      <div id="photo-upload-preview" style="display:none;padding:12px 18px 0">
+        <div id="photo-upload-thumbs" style="display:flex;gap:6px;overflow-x:auto"></div>
+      </div>
       <div style="padding:14px 18px">
-        <textarea id="video-upload-caption" placeholder="Escribe un pie de foto…" style="width:100%;border:none;resize:none;font-family:'Inter',sans-serif;font-size:14px;outline:none;min-height:60px"></textarea>
+        <textarea id="upload-caption" placeholder="Escribe un pie de foto…" style="width:100%;border:none;resize:none;font-family:'Inter',sans-serif;font-size:14px;outline:none;min-height:60px"></textarea>
         <div style="display:flex;align-items:center;gap:8px;border-top:1px solid var(--g1);padding-top:12px;margin-top:8px;position:relative">
           <span style="font-size:16px">📍</span>
-          <input type="text" id="video-upload-location" placeholder="Añadir ubicación" style="flex:1;border:none;font-family:'Inter',sans-serif;font-size:13px;outline:none">
-          <div class="search-suggest-dropdown" id="video-upload-location-suggest" style="left:24px;top:100%"></div>
+          <input type="text" id="upload-location" placeholder="Añadir ubicación" style="flex:1;border:none;font-family:'Inter',sans-serif;font-size:13px;outline:none">
+          <div class="search-suggest-dropdown" id="upload-location-suggest" style="left:24px;top:100%"></div>
         </div>
       </div>
     </div>
@@ -1188,7 +1194,7 @@ a{text-decoration:none;color:inherit}
     </div>
   </div>
   <div class="profile-nav" style="max-width:720px;margin:0 auto">
-    <button class="profile-nav-item active" onclick="profileTab(this,'videos')">🎬 Vídeos</button>
+    <button class="profile-nav-item active" onclick="profileTab(this,'videos')">🎬 Publicaciones</button>
     <button class="profile-nav-item" onclick="profileTab(this,'misresenas')">⭐ Reseñas</button>
     <button class="profile-nav-item" onclick="profileTab(this,'guardado')">🔖 Guardado</button>
     <button class="profile-nav-item" onclick="profileTab(this,'actividad')">📊 Actividad</button>
@@ -3143,15 +3149,20 @@ async function saveBioEdit(){
   }catch(e){ alert(e.message); }
 }
 let videoUploadFile=null;
+let photoUploadFiles=[];
+let uploadMode=null; // 'video' | 'photos'
 function openVideoUploadModal(){
-  if(!currentUser){ showLoginPrompt('Inicia sesión para subir vídeos.'); return; }
+  if(!currentUser){ showLoginPrompt('Inicia sesión para publicar.'); return; }
   videoUploadFile=null;
-  document.getElementById('video-upload-picker').style.display='block';
+  photoUploadFiles=[];
+  uploadMode=null;
+  document.getElementById('upload-choose-type').style.display='block';
   document.getElementById('video-upload-details').style.display='none';
   document.getElementById('video-upload-submit-btn').style.display='none';
-  document.getElementById('video-upload-caption').value='';
-  document.getElementById('video-upload-location').value='';
+  document.getElementById('upload-caption').value='';
+  document.getElementById('upload-location').value='';
   document.getElementById('video-upload-file-input').value='';
+  document.getElementById('photo-upload-file-input').value='';
   document.getElementById('video-upload-overlay').style.display='flex';
 }
 function closeVideoUploadModal(){
@@ -3160,19 +3171,39 @@ function closeVideoUploadModal(){
   if(preview.src) URL.revokeObjectURL(preview.src);
   preview.removeAttribute('src');
   videoUploadFile=null;
+  photoUploadFiles=[];
 }
 function onVideoFileSelected(file){
   if(!file) return;
+  uploadMode='video';
   videoUploadFile=file;
-  document.getElementById('video-upload-picker').style.display='none';
+  document.getElementById('upload-choose-type').style.display='none';
   document.getElementById('video-upload-details').style.display='block';
+  document.getElementById('video-upload-preview').style.display='block';
+  document.getElementById('photo-upload-preview').style.display='none';
   document.getElementById('video-upload-submit-btn').style.display='block';
   document.getElementById('video-upload-preview').src=URL.createObjectURL(file);
 }
+function onPhotosSelected(files){
+  if(!files||!files.length) return;
+  uploadMode='photos';
+  photoUploadFiles=[...files].slice(0,10); // hasta 10 fotos por carrusel, como Instagram
+  document.getElementById('upload-choose-type').style.display='none';
+  document.getElementById('video-upload-details').style.display='block';
+  document.getElementById('video-upload-preview').style.display='none';
+  document.getElementById('photo-upload-preview').style.display='block';
+  document.getElementById('video-upload-submit-btn').style.display='block';
+  const thumbs=document.getElementById('photo-upload-thumbs');
+  thumbs.innerHTML=photoUploadFiles.map((f,i)=>`<img src="${URL.createObjectURL(f)}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;flex-shrink:0">`).join('');
+}
+async function submitUpload(){
+  if(uploadMode==='video') return submitVideoUpload();
+  if(uploadMode==='photos') return submitPhotosUpload();
+}
 async function submitVideoUpload(){
   if(!videoUploadFile) return;
-  const caption=document.getElementById('video-upload-caption').value.trim();
-  const location=document.getElementById('video-upload-location').value.trim();
+  const caption=document.getElementById('upload-caption').value.trim();
+  const location=document.getElementById('upload-location').value.trim();
   const submitBtn=document.getElementById('video-upload-submit-btn');
   submitBtn.textContent='Subiendo…'; submitBtn.disabled=true;
   const fd=new FormData();
@@ -3183,6 +3214,27 @@ async function submitVideoUpload(){
     const resp=await fetch(`${LOCAL_DB_URL}/api/upload/video`,{method:'POST',headers:{'Authorization':'Bearer '+authToken},body:fd});
     const data=await resp.json();
     if(!resp.ok) throw new Error(data.error||'No se pudo subir el vídeo.');
+    closeVideoUploadModal();
+    renderMyVideos();
+  }catch(e){
+    alert(e.message);
+    submitBtn.textContent='Publicar'; submitBtn.disabled=false;
+  }
+}
+async function submitPhotosUpload(){
+  if(!photoUploadFiles.length) return;
+  const caption=document.getElementById('upload-caption').value.trim();
+  const location=document.getElementById('upload-location').value.trim();
+  const submitBtn=document.getElementById('video-upload-submit-btn');
+  submitBtn.textContent='Subiendo…'; submitBtn.disabled=true;
+  const fd=new FormData();
+  photoUploadFiles.forEach(f=>fd.append('photos',f));
+  fd.append('caption',caption);
+  fd.append('location',location);
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/upload/photos`,{method:'POST',headers:{'Authorization':'Bearer '+authToken},body:fd});
+    const data=await resp.json();
+    if(!resp.ok) throw new Error(data.error||'No se pudieron subir las fotos.');
     closeVideoUploadModal();
     renderMyVideos();
   }catch(e){
@@ -3238,6 +3290,87 @@ function renderVideoCard(v,allowDelete){
     </div>
   </div>`;
 }
+// Tarjeta de post de fotos (carrusel) — mismo formato que la de vídeo
+// (pie de foto, ubicación, "me gusta", comentarios), pero con varias fotos
+// deslizables en vez de un vídeo.
+function renderPhotoPostCard(p,allowDelete){
+  const commentsId='pcomments-'+p.id;
+  const uploaderHtml=p.user_name?`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer" onclick="openPublicProfile(${p.user_id})">
+    ${p.user_avatar?`<div style="width:28px;height:28px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${p.user_avatar}');background-size:cover;background-position:center;flex-shrink:0"></div>`:`<div style="width:28px;height:28px;border-radius:50%;background:rgba(224,153,92,0.15);color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${p.user_name.charAt(0).toUpperCase()}</div>`}
+    <span style="font-size:13px;font-weight:600;color:var(--text)">${p.user_name}</span>
+  </div>`:'';
+  const images=p.images||[];
+  const carouselHtml=`<div style="display:flex;overflow-x:auto;scroll-snap-type:x mandatory;aspect-ratio:1/1;max-height:420px">
+    ${images.map(url=>`<img src="${LOCAL_DB_URL}${url}" onclick="openImageLightbox('${LOCAL_DB_URL}${url}')" style="width:100%;height:100%;object-fit:cover;flex-shrink:0;scroll-snap-align:start;cursor:zoom-in">`).join('')}
+  </div>${images.length>1?`<div style="text-align:center;font-size:11px;color:var(--textl);padding:4px 0">1/${images.length} · desliza para ver más</div>`:''}`;
+  return `<div style="background:var(--white);border:1px solid var(--g2);border-radius:12px;overflow:hidden;margin-bottom:14px">
+    ${uploaderHtml}
+    <div style="position:relative">
+      ${carouselHtml}
+      ${allowDelete?`<button onclick="deleteMyPhotoPost(${p.id})" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer">🗑</button>`:''}
+    </div>
+    <div style="padding:12px 14px">
+      ${p.caption?`<div class="vcaption" onclick="this.classList.toggle('expanded')" style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:8px;cursor:pointer">${p.caption}</div>`:''}
+      <div style="display:flex;gap:16px;font-size:12.5px;color:var(--textl);align-items:center">
+        <span onclick="togglePhotoPostLike(${p.id},this)" data-liked="${p.isLiked?'1':'0'}" style="cursor:pointer;display:flex;align-items:center;gap:4px">${heartSVG(!!p.isLiked,14)} <span class="vlike-count">${p.likeCount||0}</span></span>
+        <span onclick="togglePhotoPostComments(${p.id})" style="cursor:pointer">💬 ${p.commentCount||0}</span>
+        ${p.location?`<span>📍 ${p.location}</span>`:''}
+      </div>
+      <div id="${commentsId}" style="display:none;margin-top:10px;border-top:1px solid var(--g1);padding-top:10px"></div>
+    </div>
+  </div>`;
+}
+async function togglePhotoPostLike(postId,el){
+  if(!currentUser){ showLoginPrompt('Inicia sesión para dar "me gusta".'); return; }
+  const liked=el.getAttribute('data-liked')==='1';
+  const countEl=el.querySelector('.vlike-count');
+  try{
+    await fetch(`${LOCAL_DB_URL}/api/photo-posts/${postId}/like`,{method:liked?'DELETE':'POST',headers:{'Authorization':'Bearer '+authToken}});
+    el.setAttribute('data-liked',liked?'0':'1');
+    el.innerHTML=`${heartSVG(!liked,14)} <span class="vlike-count">${Math.max(0,(parseInt(countEl.textContent,10)||0)+(liked?-1:1))}</span>`;
+  }catch(e){ alert('No se pudo actualizar. Inténtalo de nuevo.'); }
+}
+async function togglePhotoPostComments(postId){
+  const box=document.getElementById('pcomments-'+postId);
+  if(!box) return;
+  if(box.style.display==='block'){ box.style.display='none'; return; }
+  box.style.display='block';
+  box.innerHTML='<div class="inline-loading"><div class="spinner"></div> Cargando comentarios…</div>';
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/photo-posts/${postId}/comments`);
+    const data=await resp.json();
+    const comments=data.comments||[];
+    const list=comments.length?comments.map(c=>`
+      <div style="margin-bottom:8px;font-size:12.5px">
+        <strong style="cursor:pointer" onclick="openPublicProfile(${c.user_id})">${c.user_name}</strong>
+        <span style="color:var(--textm)">${c.text}</span>
+      </div>`).join(''):'<div style="font-size:12.5px;color:var(--textl);margin-bottom:8px">Sé el primero en comentar.</div>';
+    const inputHtml=currentUser?`<div style="display:flex;gap:6px;margin-top:6px">
+      <input type="text" id="pcomment-input-${postId}" placeholder="Escribe un comentario…" style="flex:1;padding:7px 10px;border:1px solid var(--g2);border-radius:8px;font-size:12.5px;font-family:'Inter',sans-serif" onkeydown="if(event.key==='Enter')postPhotoPostComment(${postId})">
+      <button onclick="postPhotoPostComment(${postId})" style="background:var(--orange);color:white;border:none;border-radius:8px;padding:0 12px;font-size:12.5px;cursor:pointer">Enviar</button>
+    </div>`:'';
+    box.innerHTML=list+inputHtml;
+  }catch(e){ box.innerHTML='<div style="font-size:12.5px;color:var(--textl)">No se pudieron cargar los comentarios.</div>'; }
+}
+async function postPhotoPostComment(postId){
+  if(!currentUser){ showLoginPrompt('Inicia sesión para comentar.'); return; }
+  const input=document.getElementById('pcomment-input-'+postId);
+  const text=input.value.trim();
+  if(!text) return;
+  try{
+    await fetch(`${LOCAL_DB_URL}/api/photo-posts/${postId}/comments`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({text})});
+    input.value='';
+    document.getElementById('pcomments-'+postId).style.display='none';
+    togglePhotoPostComments(postId);
+  }catch(e){ alert('No se pudo publicar el comentario.'); }
+}
+async function deleteMyPhotoPost(id){
+  if(!confirm('¿Borrar esta publicación?')) return;
+  try{
+    await fetch(`${LOCAL_DB_URL}/api/photo-posts/${id}`,{method:'DELETE',headers:{'Authorization':'Bearer '+authToken}});
+    renderMyVideos();
+  }catch(e){ alert('No se pudo borrar la publicación.'); }
+}
 async function toggleVideoLike(videoId,el){
   if(!currentUser){ showLoginPrompt('Inicia sesión para dar "me gusta".'); return; }
   const liked=el.getAttribute('data-liked')==='1';
@@ -3288,10 +3421,12 @@ async function renderMyVideos(){
   try{
     const resp=await fetch(`${LOCAL_DB_URL}/api/users/${currentUser.id}/public`,{headers:{'Authorization':'Bearer '+authToken}});
     const data=await resp.json();
-    const videos=data.videos||[];
-    if(!videos.length){ grid.innerHTML='<div class="favs-empty"><div class="favs-empty-icon">🎬</div><div class="empty-title">Sin vídeos aún</div><div class="empty-sub">Sube tu primer vídeo con el botón de arriba.</div></div>'; return; }
-    grid.innerHTML=videos.map(v=>renderVideoCard(v,true)).join('');
-  }catch(e){ grid.innerHTML='<div class="ia-prose">No se pudieron cargar tus vídeos.</div>'; }
+    const videos=(data.videos||[]).map(v=>({...v,__type:'video'}));
+    const photoPosts=(data.photoPosts||[]).map(p=>({...p,__type:'photos'}));
+    const items=[...videos,...photoPosts].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    if(!items.length){ grid.innerHTML='<div class="favs-empty"><div class="favs-empty-icon">🎬</div><div class="empty-title">Sin publicaciones aún</div><div class="empty-sub">Sube tu primer vídeo o carrusel de fotos con el botón de arriba.</div></div>'; return; }
+    grid.innerHTML=items.map(it=>it.__type==='video'?renderVideoCard(it,true):renderPhotoPostCard(it,true)).join('');
+  }catch(e){ grid.innerHTML='<div class="ia-prose">No se pudieron cargar tus publicaciones.</div>'; }
 }
 async function deleteMyVideo(id){
   if(!confirm('¿Borrar este vídeo?')) return;
@@ -3325,7 +3460,10 @@ async function openPublicProfile(userId){
     const avaHtml=u.avatar_url?`<div onclick="openImageLightbox('${LOCAL_DB_URL}${u.avatar_url}')" style="width:72px;height:72px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${u.avatar_url}');background-size:cover;background-position:center;margin:0 auto 12px;border:3px solid var(--g2);cursor:pointer"></div>`
       :`<div class="profile-ava" style="margin:0 auto 12px"><span>${u.name.charAt(0).toUpperCase()}</span></div>`;
     const followBtn=currentUser?`<button class="btn-ia" id="pp-follow-btn" style="width:auto;padding:9px 22px;margin-top:10px" onclick="togglePublicFollow(${u.id})">${data.isFollowing?'✓ Siguiendo':'+ Seguir'}</button>`:'';
-    const videosHtml=(data.videos||[]).length?`<div style="max-width:640px;margin-top:10px;display:grid;grid-template-columns:repeat(2,1fr);gap:14px">${data.videos.map(v=>renderVideoCard(v,false)).join('')}</div>`:'<div style="font-size:13px;color:var(--textl)">Sin vídeos todavía.</div>';
+    const publicVideos=(data.videos||[]).map(v=>({...v,__type:'video'}));
+    const publicPhotoPosts=(data.photoPosts||[]).map(p=>({...p,__type:'photos'}));
+    const publicItems=[...publicVideos,...publicPhotoPosts].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    const videosHtml=publicItems.length?`<div style="max-width:640px;margin-top:10px;display:grid;grid-template-columns:repeat(2,1fr);gap:14px">${publicItems.map(it=>it.__type==='video'?renderVideoCard(it,false):renderPhotoPostCard(it,false)).join('')}</div>`:'<div style="font-size:13px;color:var(--textl)">Sin publicaciones todavía.</div>';
     const recsHtml=(data.reviews||[]).length?data.reviews.map(r=>`
       <div class="review-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -3346,7 +3484,7 @@ async function openPublicProfile(userId){
         ${followBtn}
       </div>
       <div class="rep-card" style="margin-bottom:16px"><div class="rep-header">🍽 Recomendaciones</div>${recsHtml}</div>
-      <div class="rep-card"><div class="rep-header">🎬 Vídeos</div>${videosHtml}</div>
+      <div class="rep-card"><div class="rep-header">🎬 Publicaciones</div>${videosHtml}</div>
     `;
   }catch(e){
     body.innerHTML='<div class="ia-prose">'+e.message+'</div>';
@@ -4353,7 +4491,7 @@ loadAutoLocationPref();
 applyTranslations();
 attachSearchSuggestions('hero-search',{runSearch:heroSearch,includeFood:false});
 attachSearchSuggestions('map-city-input',{runSearch:mapSearch,includeFood:true});
-attachSearchSuggestions('video-upload-location',{runSearch:()=>{},includeFood:false});
+attachSearchSuggestions('upload-location',{runSearch:()=>{},includeFood:false});
 initAvatarCropDrag();
 </script>
 </body>

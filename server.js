@@ -122,6 +122,32 @@ appDb.exec(`
     text TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS photo_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    caption TEXT,
+    location TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS photo_post_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    photo_url TEXT NOT NULL,
+    position INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS photo_post_likes (
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (post_id, user_id)
+  );
+  CREATE TABLE IF NOT EXISTS photo_post_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS favorites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -161,7 +187,8 @@ const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars');
 const VIDEOS_DIR = path.join(UPLOADS_DIR, 'videos');
 const REVIEW_PHOTOS_DIR = path.join(UPLOADS_DIR, 'review-photos');
-[UPLOADS_DIR, AVATARS_DIR, VIDEOS_DIR, REVIEW_PHOTOS_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+const PHOTO_POSTS_DIR = path.join(UPLOADS_DIR, 'photo-posts');
+[UPLOADS_DIR, AVATARS_DIR, VIDEOS_DIR, REVIEW_PHOTOS_DIR, PHOTO_POSTS_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 function makeUploader(dir, allowedMimePrefix, maxSizeMB) {
@@ -183,6 +210,7 @@ function makeUploader(dir, allowedMimePrefix, maxSizeMB) {
 const uploadAvatar = makeUploader(AVATARS_DIR, 'image/', 8);
 const uploadVideo = makeUploader(VIDEOS_DIR, 'video/', 100);
 const uploadReviewPhoto = makeUploader(REVIEW_PHOTOS_DIR, 'image/', 8);
+const uploadPhotoPost = makeUploader(PHOTO_POSTS_DIR, 'image/', 8);
 
 // Moderación de la foto de una reseña — misma idea que con los vídeos, pero
 // más simple: la propia foto subida ya es la imagen a analizar, no hace
@@ -480,6 +508,68 @@ app.post('/api/videos/:id/comments', requireAuth, (req, res) => {
   res.json({ ok: true, id: info.lastInsertRowid });
 });
 
+// ═══════════════════════════════════════════════════════════════
+// POSTS DE FOTOS (CARRUSEL) — igual que los vídeos, pero con varias
+// fotos en un mismo post en vez de un solo archivo de vídeo. Cada foto
+// se modera por separado antes de aceptar el post entero.
+// ═══════════════════════════════════════════════════════════════
+app.post('/api/upload/photos', requireAuth, (req, res) => {
+  uploadPhotoPost.array('photos', 10)(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.files || !req.files.length) return res.status(400).json({ error: 'No se recibió ninguna foto.' });
+    // Moderamos cada foto del carrusel — si alguna no pasa, se rechaza el
+    // post entero (más simple y más seguro que publicar solo las que sí).
+    for (const file of req.files) {
+      const moderation = await moderateReviewPhoto(file.path);
+      if (!moderation.ok) {
+        req.files.forEach(f => { try { fs.unlinkSync(f.path); } catch (e) {/* nada que hacer si ya no está */} });
+        return res.status(400).json({ error: '🚫 ' + moderation.reason });
+      }
+    }
+    const caption = String(req.body?.caption || '').slice(0, 280);
+    const location = String(req.body?.location || '').slice(0, 120);
+    const info = appDb.prepare('INSERT INTO photo_posts (user_id, caption, location, created_at) VALUES (?,?,?,?)')
+      .run(req.user.id, caption, location, new Date().toISOString());
+    const insertImg = appDb.prepare('INSERT INTO photo_post_images (post_id, photo_url, position) VALUES (?,?,?)');
+    req.files.forEach((file, i) => insertImg.run(info.lastInsertRowid, `/uploads/photo-posts/${file.filename}`, i));
+    res.json({ ok: true, id: info.lastInsertRowid });
+  });
+});
+app.delete('/api/photo-posts/:id', requireAuth, (req, res) => {
+  const post = appDb.prepare('SELECT * FROM photo_posts WHERE id = ?').get(req.params.id);
+  if (!post) return res.status(404).json({ error: 'Publicación no encontrada.' });
+  if (post.user_id !== req.user.id) return res.status(403).json({ error: 'No puedes borrar la publicación de otra persona.' });
+  const images = appDb.prepare('SELECT photo_url FROM photo_post_images WHERE post_id = ?').all(req.params.id);
+  appDb.prepare('DELETE FROM photo_posts WHERE id = ?').run(req.params.id);
+  appDb.prepare('DELETE FROM photo_post_images WHERE post_id = ?').run(req.params.id);
+  images.forEach(img => { try { fs.unlinkSync(path.join(PHOTO_POSTS_DIR, path.basename(img.photo_url))); } catch (e) {/* nada que hacer si ya no está */} });
+  res.json({ ok: true });
+});
+app.post('/api/photo-posts/:id/like', requireAuth, (req, res) => {
+  appDb.prepare('INSERT OR IGNORE INTO photo_post_likes (post_id, user_id, created_at) VALUES (?,?,?)')
+    .run(req.params.id, req.user.id, new Date().toISOString());
+  res.json({ ok: true });
+});
+app.delete('/api/photo-posts/:id/like', requireAuth, (req, res) => {
+  appDb.prepare('DELETE FROM photo_post_likes WHERE post_id = ? AND user_id = ?').run(req.params.id, req.user.id);
+  res.json({ ok: true });
+});
+app.get('/api/photo-posts/:id/comments', (req, res) => {
+  const rows = appDb.prepare(`
+    SELECT photo_post_comments.id, photo_post_comments.text, photo_post_comments.created_at, users.id as user_id, users.name as user_name, users.avatar_url as user_avatar
+    FROM photo_post_comments JOIN users ON users.id = photo_post_comments.user_id
+    WHERE post_id = ? ORDER BY photo_post_comments.created_at ASC
+  `).all(req.params.id);
+  res.json({ comments: rows });
+});
+app.post('/api/photo-posts/:id/comments', requireAuth, (req, res) => {
+  const text = String(req.body?.text || '').trim().slice(0, 500);
+  if (!text) return res.status(400).json({ error: 'El comentario no puede estar vacío.' });
+  const info = appDb.prepare('INSERT INTO photo_post_comments (post_id, user_id, text, created_at) VALUES (?,?,?,?)')
+    .run(req.params.id, req.user.id, text, new Date().toISOString());
+  res.json({ ok: true, id: info.lastInsertRowid });
+});
+
 app.delete('/api/videos/:id', requireAuth, (req, res) => {
   const video = appDb.prepare('SELECT * FROM user_videos WHERE id = ?').get(req.params.id);
   if (!video) return res.status(404).json({ error: 'Vídeo no encontrado.' });
@@ -524,7 +614,15 @@ app.get('/api/users/:id/public', (req, res) => {
       const isLiked = req.user ? !!appDb.prepare('SELECT 1 FROM video_likes WHERE video_id = ? AND user_id = ?').get(v.id, req.user.id) : false;
       return { ...v, likeCount, commentCount, isLiked };
     });
-  res.json({ user, followerCount, followingCount, isFollowing, reviews, videos });
+  const photoPosts = appDb.prepare('SELECT id, caption, location, created_at FROM photo_posts WHERE user_id = ? ORDER BY created_at DESC').all(id)
+    .map(p => {
+      const images = appDb.prepare('SELECT photo_url FROM photo_post_images WHERE post_id = ? ORDER BY position ASC').all(p.id).map(r => r.photo_url);
+      const likeCount = appDb.prepare('SELECT COUNT(*) c FROM photo_post_likes WHERE post_id = ?').get(p.id).c;
+      const commentCount = appDb.prepare('SELECT COUNT(*) c FROM photo_post_comments WHERE post_id = ?').get(p.id).c;
+      const isLiked = req.user ? !!appDb.prepare('SELECT 1 FROM photo_post_likes WHERE post_id = ? AND user_id = ?').get(p.id, req.user.id) : false;
+      return { ...p, images, likeCount, commentCount, isLiked };
+    });
+  res.json({ user, followerCount, followingCount, isFollowing, reviews, videos, photoPosts });
 });
 // ═══════════════════════════════════════════════════════════════
 // FAVORITOS Y LISTAS GUARDADAS — ligados a la cuenta, no al dispositivo.
