@@ -754,22 +754,9 @@ a{text-decoration:none;color:inherit}
 <div id="page-tendencias" class="page">
   <div class="trending-hero">
     <div class="trending-title">🔥 Tendencias</div>
-    <div class="trending-sub">Restaurantes virales, en alza y los más populares del momento</div>
-    <div class="trending-tabs">
-      <button class="trend-tab active" onclick="trendTab(this,'parati')">Para ti</button>
-      <button class="trend-tab" onclick="trendTab(this,'trending')">Trending</button>
-      <button class="trend-tab" onclick="trendTab(this,'platos')">Platos virales</button>
-      <button class="trend-tab" onclick="trendTab(this,'nuevas')">Nuevas aperturas</button>
-      <button class="trend-tab" onclick="trendTab(this,'guardados')">Más guardados</button>
-    </div>
+    <div class="trending-sub">Los vídeos con más me gusta y comentarios, subidos por gente real de GastroMap</div>
   </div>
-  <div style="padding:0 20px;margin-bottom:4px">
-    <div style="font-size:13px;font-weight:600;color:var(--textm);margin-bottom:10px">🎬 Reel del día</div>
-    <video autoplay muted loop playsinline style="width:200px;max-width:100%;border-radius:16px;display:block;box-shadow:var(--shadow2)">
-      <source src="https://d8j0ntlcm91z4.cloudfront.net/user_3FKzKRSMzXjPCaxTwwAi0fbWZtW/hf_20260907_225144_c4b8b319-20ec-4b65-bc75-1ec6687ae70e.mp4" type="video/mp4">
-    </video>
-  </div>
-  <div class="trending-grid" id="trending-grid"></div>
+  <div id="trending-grid" style="padding:16px 20px;max-width:420px;margin:0 auto"></div>
 </div>
 
 <!-- ═══════════════════════════════ LISTAS ═══════════════════════════════ -->
@@ -2382,56 +2369,30 @@ async function removeFav(id){
 }
 
 // ═══════════════════════════════════════════════════════════
-// TENDENCIAS
-// ═══════════════════════════════════════════════════════════
-const TREND_DESC_TEMPLATES=[
-  r=>`POV: acabas de descubrir ${r.name} 🔥 ${r.cuisine.toLowerCase()} en su máximo esplendor`,
-  r=>`${r.score}/100 en GastroMap — reserva con semanas de antelación, merece la pena`,
-  r=>`El secreto mejor guardado de ${r.address.split(',').pop().trim()} 🤫`,
-  r=>`Esta experiencia en ${r.name} cambió mi forma de ver la gastronomía 🍽`,
-  r=>`Si vas a ${r.address.split(',').pop().trim()}, esto no te lo puedes perder 🔥`
-];
-function buildTrending(){
-  const pool = (typeof CREATORS!=='undefined'&&CREATORS.length) ? CREATORS.map(c=>c.handle) : ['@gastromap'];
-  return GLOBAL_TOP.map(r=>{
-    const h = hashStr(r.name);
-    return {
-      name:r.name,
-      loc:`${r.cuisine} · ${r.address.split(',').pop().trim()}`,
-      cuisineTag:r.cuisine,
-      photo:r.photo,
-      creator: pool[h % pool.length],
-      likes: (10+(h%50))+'.'+(h%10)+'K',
-      comments: (200+(h%3800)).toLocaleString(),
-      desc: TREND_DESC_TEMPLATES[h % TREND_DESC_TEMPLATES.length](r)
-    };
-  });
-}
-function renderTrending(){
+// TENDENCIAS — feed real de los vídeos que sube la gente en GastroMap,
+// ordenado por los que más me gusta/comentarios reales tienen. Antes esto
+// eran tarjetas de restaurantes con estadísticas inventadas; ahora es
+// contenido de verdad, aunque al principio haya poco (según vaya usándose
+// la app, se irá llenando solo).
+async function renderTrending(){
   const grid=document.getElementById('trending-grid');
-  const data=buildTrending();
-  grid.innerHTML=data.map((d,i)=>`
-    <div class="trend-card" onclick="openRestaurantFromGlobal(GLOBAL_TOP[${i}])">
-      <div class="trend-img">
-        <img src="${d.photo}" alt="${d.name}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
-        <div class="trend-overlay"></div>
-        <div class="trend-stats">
-          <div class="trend-stat">${heartSVG(true,15)} ${d.likes}</div>
-          <div class="trend-stat">💬 ${d.comments}</div>
-        </div>
-        <div class="trend-content">
-          <div class="trend-creator"><img ${avatarImgAttrs(d.creator,d.creator)} alt="" style="width:22px;height:22px;border-radius:50%;object-fit:cover;border:1.5px solid rgba(255,255,255,0.3)"><div class="trend-handle">${d.creator}</div></div>
-          <div class="trend-name">${d.name}</div>
-          <div class="trend-loc">${d.loc}</div>
-        </div>
-      </div>
-      <div class="trend-body"><div class="trend-desc">${d.desc}</div></div>
-    </div>`).join('');
-}
-function trendTab(btn,tab){
-  document.querySelectorAll('.trend-tab').forEach(t=>t.classList.remove('active'));
-  btn.classList.add('active');
-  renderTrending();
+  grid.innerHTML='<div class="inline-loading"><div class="spinner"></div> Cargando lo más popular…</div>';
+  try{
+    const resp=await fetch(`${LOCAL_DB_URL}/api/videos/trending?limit=30`,{headers:authToken?{'Authorization':'Bearer '+authToken}:{}});
+    const data=await resp.json();
+    const videos=data.videos||[];
+    if(!videos.length){
+      grid.innerHTML=`<div class="favs-empty">
+        <div class="favs-empty-icon">🎬</div>
+        <div class="empty-title">Todavía no hay vídeos</div>
+        <div class="empty-sub">En cuanto la gente empiece a subir vídeos desde su perfil, aquí aparecerán los más populares de verdad — nada inventado.</div>
+      </div>`;
+      return;
+    }
+    grid.innerHTML=videos.map(v=>renderVideoCard(v,false)).join('');
+  }catch(e){
+    grid.innerHTML='<div class="ia-prose">No se pudo cargar Tendencias. Comprueba tu conexión.</div>';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3189,7 +3150,12 @@ function closeVideoDetail(){
 }
 function renderVideoCard(v,allowDelete){
   const commentsId='vcomments-'+v.id;
+  const uploaderHtml=v.user_name?`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer" onclick="openPublicProfile(${v.user_id})">
+    ${v.user_avatar?`<div style="width:28px;height:28px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${v.user_avatar}');background-size:cover;background-position:center;flex-shrink:0"></div>`:`<div style="width:28px;height:28px;border-radius:50%;background:rgba(224,153,92,0.15);color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${v.user_name.charAt(0).toUpperCase()}</div>`}
+    <span style="font-size:13px;font-weight:600;color:var(--text)">${v.user_name}</span>
+  </div>`:'';
   return `<div style="background:var(--white);border:1px solid var(--g2);border-radius:12px;overflow:hidden;margin-bottom:14px">
+    ${uploaderHtml}
     <div style="position:relative">
       <video src="${LOCAL_DB_URL}${v.video_url}" controls style="width:100%;display:block;background:#000;aspect-ratio:9/16;object-fit:cover;max-height:420px"></video>
       ${allowDelete?`<button onclick="deleteMyVideo(${v.id})" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer">🗑</button>`:''}

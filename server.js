@@ -545,6 +545,28 @@ app.delete('/api/bot-conversations/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/videos/trending', (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit || '30', 10), 100);
+  // "Viral" = combinación de "me gusta" y comentarios reales, con algo más
+  // de peso a los comentarios (implican más esfuerzo/interés que un like).
+  // Nada de esto es inventado — son acciones reales de usuarios reales.
+  const rows = appDb.prepare(`
+    SELECT v.id, v.video_url, v.caption, v.location, v.created_at,
+           u.id as user_id, u.name as user_name, u.avatar_url as user_avatar,
+           (SELECT COUNT(*) FROM video_likes WHERE video_id = v.id) as likeCount,
+           (SELECT COUNT(*) FROM video_comments WHERE video_id = v.id) as commentCount
+    FROM user_videos v JOIN users u ON u.id = v.user_id
+    ORDER BY (likeCount * 2 + commentCount * 3) DESC, v.created_at DESC
+    LIMIT ?
+  `).all(limit);
+  const userId = req.user ? req.user.id : null;
+  const withLiked = rows.map(r => ({
+    ...r,
+    isLiked: userId ? !!appDb.prepare('SELECT 1 FROM video_likes WHERE video_id = ? AND user_id = ?').get(r.id, userId) : false
+  }));
+  res.json({ videos: withLiked });
+});
+
 app.get('/api/users/:id/followers', (req, res) => {
   const rows = appDb.prepare(`
     SELECT u.id, u.name, u.avatar_url FROM follows f JOIN users u ON u.id = f.follower_id
