@@ -2862,6 +2862,7 @@ async function submitReview(){
     renderReviewForm();
     loadReviews(d.id,d.name);
     refreshMyReviewCount();
+    cachedUserReviewsForBot=null; // se ha añadido una reseña nueva, que se vuelva a leer la próxima vez
   }catch(e){
     alert('Error de conexión al publicar la reseña.');
   }
@@ -2946,6 +2947,7 @@ async function registerUser(){
     if(!resp.ok){ err.textContent=data.error||'No se pudo crear la cuenta.'; return; }
     authToken=data.token; currentUser=data.user;
     localStorage.setItem('gm_auth_token',authToken);
+    cachedUserReviewsForBot=null;
     await loadMyFavoritesAndLists();
     renderAuthUI();
   }catch(e){ err.textContent='Error de conexión. Inténtalo de nuevo.'; }
@@ -2965,6 +2967,7 @@ async function loginUser(){
     if(!resp.ok){ err.textContent=data.error||'No se pudo iniciar sesión.'; return; }
     authToken=data.token; currentUser=data.user;
     localStorage.setItem('gm_auth_token',authToken);
+    cachedUserReviewsForBot=null;
     await loadMyFavoritesAndLists();
     renderAuthUI();
   }catch(e){ err.textContent='Error de conexión. Inténtalo de nuevo.'; }
@@ -2974,6 +2977,9 @@ async function logoutUser(){
   authToken=null; currentUser=null;
   localStorage.removeItem('gm_auth_token');
   clearMyFavoritesAndLists();
+  cachedUserReviewsForBot=null;
+  botConversationsCache={};
+  newBotChat(); // borra también la conversación visible en pantalla y su historial — si no, quedaría a la vista de quien entre después en el mismo dispositivo
   renderAuthUI();
 }
 let authView='login'; // 'login' o 'register'
@@ -3880,6 +3886,31 @@ async function saveBotConversation(){
   }catch(e){/* si falla el guardado, la conversación sigue funcionando igual en pantalla, solo que no queda guardada esta vez */}
 }
 function sendBotSugg(btn){document.getElementById('bot-input').value=btn.textContent;sendBot();}
+let cachedUserReviewsForBot=null;
+// Esto es lo que de verdad distingue a GastroBot de usar ChatGPT o Claude
+// directamente: sabe lo que a ESTA persona en concreto le gusta, sin que
+// tenga que repetírselo cada vez, porque lee sus favoritos y reseñas reales
+// guardados en su cuenta.
+async function buildUserPreferenceContext(){
+  if(!currentUser) return '';
+  const favSummary=favorites.slice(0,15).map(f=>`${f.name} (${f.cuisine||'?'})`).join('; ');
+  let reviewSummary='';
+  if(cachedUserReviewsForBot===null){
+    try{
+      const resp=await fetch(`${LOCAL_DB_URL}/api/reviews/mine/list`,{headers:{'Authorization':'Bearer '+authToken}});
+      const data=await resp.json();
+      cachedUserReviewsForBot=data.reviews||[];
+    }catch(e){ cachedUserReviewsForBot=[]; }
+  }
+  if(cachedUserReviewsForBot.length){
+    reviewSummary=cachedUserReviewsForBot.slice(0,15).map(r=>`${r.restaurant_name} (le puso ${r.rating}★${r.rating<=2?', no le gustó':r.rating>=4?', le encantó':''})`).join('; ');
+  }
+  if(!favSummary && !reviewSummary) return '';
+  let ctx='\n\nCONTEXTO PERSONAL DE ESTE USUARIO (esto es justo lo que hace que seas mejor que un chat genérico: úsalo para orientar tus recomendaciones hacia sus gustos reales, sin que tenga que repetírtelos — pero no lo recites literalmente ni le digas "veo que tienes guardado X", solo úsalo con naturalidad, como lo haría un amigo que ya te conoce).';
+  if(favSummary) ctx+=`\nRestaurantes que tiene guardados como favoritos: ${favSummary}.`;
+  if(reviewSummary) ctx+=`\nReseñas que ha escrito: ${reviewSummary}.`;
+  return ctx;
+}
 async function sendBot(){
   if(botTyping) return;
   const input=document.getElementById('bot-input');
@@ -3899,7 +3930,8 @@ async function sendBot(){
   try{
     // Busca en OpenStreetMap si el mensaje menciona una zona, para responder con sitios reales
     const ctx=await findLocationContext(text);
-    let system=GASTROMAP_EXPERT_PROMPT+'\n\nEres GastroBot dentro de la app GastroMap. Usa emojis de comida de forma natural. Escribe en párrafos cortos y conversacionales, con como mucho un par de negritas para lo más importante. IMPORTANTE sobre los nombres: cuando recomiendes un restaurante concreto de la lista de datos reales, escribe su nombre EXACTAMENTE igual que aparece en esa lista (mismas mayúsculas, tildes y todo) al menos una vez en tu respuesta — la app detecta esos nombres en tu texto para mostrar automáticamente su tarjeta con foto justo debajo. No hace falta que repitas cada nombre varias veces, con una vez basta. Esto es un detalle interno de funcionamiento — NUNCA se lo expliques a la persona, ni le digas que "esto generaría una tarjeta", ni te disculpes por no poder mostrarle una tarjeta, ni menciones de ninguna forma que existen tarjetas, fotos o este mecanismo. Simplemente responde con normalidad, como lo haría cualquier persona que conoce bien de restaurantes. Ten en cuenta TODO el hilo de la conversación, no solo el último mensaje: si antes se mencionó una alergia, un presupuesto, una ocasión o un tipo de cocina, sigue teniéndolo en cuenta en tus siguientes respuestas aunque la persona no lo repita (por ejemplo, si preguntó por "algo picante" y luego dice "¿y más barato?", sigue buscando algo picante Y barato a la vez, no solo lo último). Si un mensaje combina varias condiciones a la vez (cocina, precio, alergia, ocasión, zona...), respóndelas todas juntas, no una sola.';
+    const personalCtx=await buildUserPreferenceContext();
+    let system=GASTROMAP_EXPERT_PROMPT+'\n\nEres GastroBot dentro de la app GastroMap. Usa emojis de comida de forma natural. Escribe en párrafos cortos y conversacionales, con como mucho un par de negritas para lo más importante. IMPORTANTE sobre los nombres: cuando recomiendes un restaurante concreto de la lista de datos reales, escribe su nombre EXACTAMENTE igual que aparece en esa lista (mismas mayúsculas, tildes y todo) al menos una vez en tu respuesta — la app detecta esos nombres en tu texto para mostrar automáticamente su tarjeta con foto justo debajo. No hace falta que repitas cada nombre varias veces, con una vez basta. Esto es un detalle interno de funcionamiento — NUNCA se lo expliques a la persona, ni le digas que "esto generaría una tarjeta", ni te disculpes por no poder mostrarle una tarjeta, ni menciones de ninguna forma que existen tarjetas, fotos o este mecanismo. Simplemente responde con normalidad, como lo haría cualquier persona que conoce bien de restaurantes. Ten en cuenta TODO el hilo de la conversación, no solo el último mensaje: si antes se mencionó una alergia, un presupuesto, una ocasión o un tipo de cocina, sigue teniéndolo en cuenta en tus siguientes respuestas aunque la persona no lo repita (por ejemplo, si preguntó por "algo picante" y luego dice "¿y más barato?", sigue buscando algo picante Y barato a la vez, no solo lo último). Si un mensaje combina varias condiciones a la vez (cocina, precio, alergia, ocasión, zona...), respóndelas todas juntas, no una sola.'+personalCtx;
     if(ctx){
       system+=`\n\nDatos reales de OpenStreetMap para "${ctx.place}" (úsalos como base de tu respuesta, son restaurantes que existen de verdad; no inventes otros si estos cubren lo que pide el usuario):\n${ctx.listing}`;
     } else {
