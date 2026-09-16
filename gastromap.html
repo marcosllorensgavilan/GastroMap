@@ -2316,10 +2316,10 @@ async function renderMyReviews(){
     list.innerHTML=reviews.map(r=>`
       <div class="review-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <strong>${r.restaurant_name}</strong>
+          <strong>${escapeHtml(r.restaurant_name)}</strong>
           <span>${starRatingHTML(r.rating)}</span>
         </div>
-        <div style="font-size:13px;color:var(--textm);line-height:1.5;margin-bottom:6px">${r.text}</div>
+        <div style="font-size:13px;color:var(--textm);line-height:1.5;margin-bottom:6px">${escapeHtml(r.text)}</div>
         ${r.photo_url?`<img src="${LOCAL_DB_URL}${r.photo_url}" onclick="openImageLightbox('${LOCAL_DB_URL}${r.photo_url}')" style="max-width:160px;border-radius:10px;display:block;margin-bottom:6px;cursor:pointer">`:''}
         <div style="font-size:11px;color:var(--textl)">${new Date(r.created_at).toLocaleDateString('es-ES')}</div>
       </div>`).join('');
@@ -2883,10 +2883,10 @@ async function loadReviews(restaurantId){
     list.innerHTML=reviews.map(r=>`
       <div class="review-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <strong style="cursor:pointer" onclick="openPublicProfile(${r.user_id})">${r.user_avatar?`<img src="${LOCAL_DB_URL}${r.user_avatar}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:-5px;margin-right:6px">`:''}${r.user_name}</strong>
+          <strong style="cursor:pointer" onclick="openPublicProfile(${r.user_id})">${r.user_avatar?`<img src="${LOCAL_DB_URL}${r.user_avatar}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:-5px;margin-right:6px">`:''}${escapeHtml(r.user_name)}</strong>
           <span>${starRatingHTML(r.rating)}</span>
         </div>
-        <div style="font-size:13px;color:var(--textm);line-height:1.5;margin-bottom:6px">${r.text}</div>
+        <div style="font-size:13px;color:var(--textm);line-height:1.5;margin-bottom:6px">${escapeHtml(r.text)}</div>
         ${r.photo_url?`<img src="${LOCAL_DB_URL}${r.photo_url}" onclick="openImageLightbox('${LOCAL_DB_URL}${r.photo_url}')" style="max-width:160px;border-radius:10px;display:block;margin-bottom:6px;cursor:pointer">`:''}
         <div style="font-size:11px;color:var(--textl)">${new Date(r.created_at).toLocaleDateString('es-ES')}</div>
       </div>`).join('');
@@ -3276,8 +3276,8 @@ function closeVideoDetail(){
 function renderVideoCard(v,allowDelete){
   const commentsId='vcomments-'+v.id;
   const uploaderHtml=v.user_name?`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer" onclick="openPublicProfile(${v.user_id})">
-    ${v.user_avatar?`<div style="width:28px;height:28px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${v.user_avatar}');background-size:cover;background-position:center;flex-shrink:0"></div>`:`<div style="width:28px;height:28px;border-radius:50%;background:rgba(224,153,92,0.15);color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${v.user_name.charAt(0).toUpperCase()}</div>`}
-    <span style="font-size:13px;font-weight:600;color:var(--text)">${v.user_name}</span>
+    ${v.user_avatar?`<div style="width:28px;height:28px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${v.user_avatar}');background-size:cover;background-position:center;flex-shrink:0"></div>`:`<div style="width:28px;height:28px;border-radius:50%;background:rgba(224,153,92,0.15);color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${escapeHtml(v.user_name.charAt(0).toUpperCase())}</div>`}
+    <span style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(v.user_name)}</span>
   </div>`:'';
   return `<div style="background:var(--white);border:1px solid var(--g2);border-radius:12px;overflow:hidden;margin-bottom:14px">
     ${uploaderHtml}
@@ -3286,11 +3286,11 @@ function renderVideoCard(v,allowDelete){
       ${allowDelete?`<button onclick="deleteMyVideo(${v.id})" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer">🗑</button>`:''}
     </div>
     <div style="padding:12px 14px">
-      ${v.caption?`<div class="vcaption" onclick="this.classList.toggle('expanded')" style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:8px;cursor:pointer">${v.caption}</div>`:''}
+      ${v.caption?`<div class="vcaption" onclick="this.classList.toggle('expanded')" style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:8px;cursor:pointer">${escapeHtml(v.caption)}</div>`:''}
       <div style="display:flex;gap:16px;font-size:12.5px;color:var(--textl);align-items:center">
         <span onclick="toggleVideoLike(${v.id},this)" data-liked="${v.isLiked?'1':'0'}" style="cursor:pointer;display:flex;align-items:center;gap:4px">${heartSVG(!!v.isLiked,14)} <span class="vlike-count">${v.likeCount||0}</span></span>
         <span onclick="toggleVideoComments(${v.id})" style="cursor:pointer">💬 ${v.commentCount||0}</span>
-        ${v.location?`<span>📍 ${v.location}</span>`:''}
+        ${v.location?`<span>📍 ${escapeHtml(v.location)}</span>`:''}
       </div>
       <div id="${commentsId}" style="display:none;margin-top:10px;border-top:1px solid var(--g1);padding-top:10px"></div>
     </div>
@@ -3302,8 +3302,8 @@ function renderVideoCard(v,allowDelete){
 function renderPhotoPostCard(p,allowDelete){
   const commentsId='pcomments-'+p.id;
   const uploaderHtml=p.user_name?`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer" onclick="openPublicProfile(${p.user_id})">
-    ${p.user_avatar?`<div style="width:28px;height:28px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${p.user_avatar}');background-size:cover;background-position:center;flex-shrink:0"></div>`:`<div style="width:28px;height:28px;border-radius:50%;background:rgba(224,153,92,0.15);color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${p.user_name.charAt(0).toUpperCase()}</div>`}
-    <span style="font-size:13px;font-weight:600;color:var(--text)">${p.user_name}</span>
+    ${p.user_avatar?`<div style="width:28px;height:28px;border-radius:50%;background-image:url('${LOCAL_DB_URL}${p.user_avatar}');background-size:cover;background-position:center;flex-shrink:0"></div>`:`<div style="width:28px;height:28px;border-radius:50%;background:rgba(224,153,92,0.15);color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${escapeHtml(p.user_name.charAt(0).toUpperCase())}</div>`}
+    <span style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(p.user_name)}</span>
   </div>`:'';
   const images=p.images||[];
   const carouselHtml=`<div style="display:flex;overflow-x:auto;scroll-snap-type:x mandatory;aspect-ratio:1/1;max-height:420px">
@@ -3316,11 +3316,11 @@ function renderPhotoPostCard(p,allowDelete){
       ${allowDelete?`<button onclick="deleteMyPhotoPost(${p.id})" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer">🗑</button>`:''}
     </div>
     <div style="padding:12px 14px">
-      ${p.caption?`<div class="vcaption" onclick="this.classList.toggle('expanded')" style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:8px;cursor:pointer">${p.caption}</div>`:''}
+      ${p.caption?`<div class="vcaption" onclick="this.classList.toggle('expanded')" style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:8px;cursor:pointer">${escapeHtml(p.caption)}</div>`:''}
       <div style="display:flex;gap:16px;font-size:12.5px;color:var(--textl);align-items:center">
         <span onclick="togglePhotoPostLike(${p.id},this)" data-liked="${p.isLiked?'1':'0'}" style="cursor:pointer;display:flex;align-items:center;gap:4px">${heartSVG(!!p.isLiked,14)} <span class="vlike-count">${p.likeCount||0}</span></span>
         <span onclick="togglePhotoPostComments(${p.id})" style="cursor:pointer">💬 ${p.commentCount||0}</span>
-        ${p.location?`<span>📍 ${p.location}</span>`:''}
+        ${p.location?`<span>📍 ${escapeHtml(p.location)}</span>`:''}
       </div>
       <div id="${commentsId}" style="display:none;margin-top:10px;border-top:1px solid var(--g1);padding-top:10px"></div>
     </div>
@@ -3348,8 +3348,8 @@ async function togglePhotoPostComments(postId){
     const comments=data.comments||[];
     const list=comments.length?comments.map(c=>`
       <div style="margin-bottom:8px;font-size:12.5px">
-        <strong style="cursor:pointer" onclick="openPublicProfile(${c.user_id})">${c.user_name}</strong>
-        <span style="color:var(--textm)">${c.text}</span>
+        <strong style="cursor:pointer" onclick="openPublicProfile(${c.user_id})">${escapeHtml(c.user_name)}</strong>
+        <span style="color:var(--textm)">${escapeHtml(c.text)}</span>
       </div>`).join(''):'<div style="font-size:12.5px;color:var(--textl);margin-bottom:8px">Sé el primero en comentar.</div>';
     const inputHtml=currentUser?`<div style="display:flex;gap:6px;margin-top:6px">
       <input type="text" id="pcomment-input-${postId}" placeholder="Escribe un comentario…" style="flex:1;padding:7px 10px;border:1px solid var(--g2);border-radius:8px;font-size:12.5px;font-family:'Inter',sans-serif" onkeydown="if(event.key==='Enter')postPhotoPostComment(${postId})">
@@ -3399,8 +3399,8 @@ async function toggleVideoComments(videoId){
     const comments=data.comments||[];
     const list=comments.length?comments.map(c=>`
       <div style="margin-bottom:8px;font-size:12.5px">
-        <strong style="cursor:pointer" onclick="openPublicProfile(${c.user_id})">${c.user_name}</strong>
-        <span style="color:var(--textm)">${c.text}</span>
+        <strong style="cursor:pointer" onclick="openPublicProfile(${c.user_id})">${escapeHtml(c.user_name)}</strong>
+        <span style="color:var(--textm)">${escapeHtml(c.text)}</span>
       </div>`).join(''):'<div style="font-size:12.5px;color:var(--textl);margin-bottom:8px">Sé el primero en comentar.</div>';
     const inputHtml=currentUser?`<div style="display:flex;gap:6px;margin-top:6px">
       <input type="text" id="vcomment-input-${videoId}" placeholder="Escribe un comentario…" style="flex:1;padding:7px 10px;border:1px solid var(--g2);border-radius:8px;font-size:12.5px;font-family:'Inter',sans-serif" onkeydown="if(event.key==='Enter')postVideoComment(${videoId})">
@@ -3473,16 +3473,16 @@ async function openPublicProfile(userId){
     const recsHtml=(data.reviews||[]).length?data.reviews.map(r=>`
       <div class="review-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <strong>${r.restaurant_name}</strong><span>${starRatingHTML(r.rating)}</span>
+          <strong>${escapeHtml(r.restaurant_name)}</strong><span>${starRatingHTML(r.rating)}</span>
         </div>
-        <div style="font-size:13px;color:var(--textm);line-height:1.5">${r.text}</div>
+        <div style="font-size:13px;color:var(--textm);line-height:1.5">${escapeHtml(r.text)}</div>
         ${r.photo_url?`<img src="${LOCAL_DB_URL}${r.photo_url}" onclick="openImageLightbox('${LOCAL_DB_URL}${r.photo_url}')" style="max-width:160px;border-radius:10px;display:block;margin-top:6px;cursor:pointer">`:''}
       </div>`).join(''):'<div style="font-size:13px;color:var(--textl)">Sin recomendaciones todavía.</div>';
     body.innerHTML=`
       <div style="text-align:center;margin-bottom:20px">
         ${avaHtml}
-        <div class="profile-name">${u.name}</div>
-        ${u.bio?`<div style="font-size:13px;color:var(--textm);max-width:360px;margin:6px auto">${u.bio}</div>`:''}
+        <div class="profile-name">${escapeHtml(u.name)}</div>
+        ${u.bio?`<div style="font-size:13px;color:var(--textm);max-width:360px;margin:6px auto">${escapeHtml(u.bio)}</div>`:''}
         <div class="profile-stats-row">
           <div class="pstat" style="cursor:pointer" onclick="openFollowList(${u.id},'followers')"><div class="pstat-num">${data.followerCount}</div><div class="pstat-lbl">Seguidores</div></div>
           <div class="pstat" style="cursor:pointer" onclick="openFollowList(${u.id},'following')"><div class="pstat-num">${data.followingCount}</div><div class="pstat-lbl">Siguiendo</div></div>
@@ -3953,6 +3953,20 @@ async function sendBot(){
 }
 // Interpreta el markdown sencillo que usa el modelo (negrita, listas) y lo
 // convierte en HTML de verdad, en vez de mostrar los asteriscos literales.
+// Limpia texto escrito por usuarios antes de meterlo en la página — sin
+// esto, alguien podría escribir código en una reseña/comentario/bio y se
+// ejecutaría en el navegador de cualquiera que lo viera. Se usa en TODO
+// texto que haya escrito una persona (reseñas, comentarios, bio, pies de
+// foto, ubicaciones, nombres de cuenta).
+function escapeHtml(str){
+  if(str===null||str===undefined) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
 function renderMarkdown(text){
   const esc=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const bold=esc.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
@@ -4002,7 +4016,7 @@ function appendMsg(role,text,places){
   const msgs=document.getElementById('bot-messages');
   const div=document.createElement('div');
   div.className='msg-row '+role;
-  const body=role==='bot'?renderMarkdown(text):text.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  const body=role==='bot'?renderMarkdown(text):escapeHtml(text).replace(/\n/g,'<br>');
   const cards=role==='bot'?botRestaurantCards(places,text):'';
   div.innerHTML=`<div class="msg-ava ${role}">${role==='bot'?'🍽':'M'}</div><div class="msg-bubble ${role}">${body}${cards}</div>`;
   msgs.appendChild(div);
