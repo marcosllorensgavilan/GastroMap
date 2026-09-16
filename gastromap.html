@@ -1009,14 +1009,6 @@ a{text-decoration:none;color:inherit}
   </div>
 </div>
 
-<!-- ═══════════════════════════════ DETALLE DE PUBLICACIÓN ═══════════════════════════════ -->
-<div id="video-detail-overlay" onclick="if(event.target===this)closeVideoDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:5500;align-items:center;justify-content:center;padding:20px">
-  <div style="max-width:360px;width:100%;max-height:90vh;overflow-y:auto;position:relative">
-    <button onclick="closeVideoDetail()" style="position:absolute;top:-36px;right:0;background:none;border:none;color:white;font-size:28px;cursor:pointer;line-height:1">×</button>
-    <div id="video-detail-body"></div>
-  </div>
-</div>
-
 <!-- ═══════════════════════════════ RECORTAR FOTO DE PERFIL ═══════════════════════════════ -->
 <div id="avatar-crop-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:6500;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--white);border-radius:16px;max-width:360px;width:100%;box-shadow:var(--shadow2);overflow:hidden">
@@ -1285,7 +1277,6 @@ window.addEventListener('error', function(e){
 // ═══════════════════════════════════════════════════════════
 let favorites = []; // se carga del servidor tras iniciar sesión — ligado a la cuenta, no al dispositivo
 let leafletMap = null, geoLayerGroup = null, markersById = {}, allOSMPlaces = [], allOSMMap = [], openTooltipLayer = null;
-let activeMapItem = null;
 function closeOpenTooltip(){
   if(openTooltipLayer){ openTooltipLayer.closeTooltip(); openTooltipLayer=null; }
 }
@@ -1885,9 +1876,6 @@ function matchAmenityKeywordFuzzy(text){
   }
   return best;
 }
-function matchAmenityKeyword(text){
-  return matchAmenityKeywordExact(text) || matchAmenityKeywordFuzzy(text);
-}
 const FOOD_KEYWORDS={
   'tapas':['tapas','spanish'],'paella':['spanish','paella'],'marisco':['seafood','fish'],'mariscos':['seafood','fish'],
   'pasta':['italian','pasta'],'pizza':['pizza','italian'],'sushi':['japanese','sushi'],'ramen':['japanese','ramen'],
@@ -1928,9 +1916,6 @@ function matchFoodKeywordFuzzy(text){
     if(d<=tolerance && d<bestDist){ bestDist=d; best=FOOD_KEYWORDS[key]; }
   }
   return best;
-}
-function matchFoodKeyword(text){
-  return matchFoodKeywordExact(text) || matchFoodKeywordFuzzy(text);
 }
 function getCurrentLocation(){
   return new Promise((resolve,reject)=>{
@@ -2197,13 +2182,6 @@ function clearMapHighlight(){
 }
 const isTouchDevice = window.matchMedia('(hover: none)').matches;
 
-function selectMapItem(p,item){
-  if(activeMapItem) activeMapItem.classList.remove('active');
-  item.classList.add('active'); activeMapItem=item;
-  item.scrollIntoView({behavior:'smooth',block:'nearest'});
-  mapFlyTo(p.lat,p.lon,17);
-  highlightMapMarker(p.id);
-}
 function clearMapMarkers(){
   if(geoLayerGroup && leafletMap) leafletMap.removeLayer(geoLayerGroup);
   geoLayerGroup=null;
@@ -3251,28 +3229,6 @@ async function submitPhotosUpload(){
 // Tarjeta de vídeo con pie de foto, ubicación, "me gusta" y comentarios
 // reales — se usa tanto en tu propio perfil como en el perfil público de
 // cualquier otra persona.
-// Miniatura cuadrada para la rejilla de 3 columnas (como Instagram) — al
-// tocarla se abre la tarjeta completa con pie de foto, "me gusta" y
-// comentarios, en vez de mostrar todo eso apilado verticalmente de golpe.
-let videoGridCache={};
-function renderVideoThumbGrid(videos,allowDelete){
-  videos.forEach(v=>videoGridCache[v.id]={...v,allowDelete});
-  return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">${videos.map(v=>`
-    <div onclick="openVideoDetail(${v.id})" style="position:relative;aspect-ratio:1/1;cursor:pointer;background:#000">
-      <video src="${LOCAL_DB_URL}${v.video_url}" muted style="width:100%;height:100%;object-fit:cover;display:block"></video>
-    </div>`).join('')}</div>`;
-}
-function openVideoDetail(id){
-  const v=videoGridCache[id];
-  if(!v) return;
-  const overlay=document.getElementById('video-detail-overlay');
-  document.getElementById('video-detail-body').innerHTML=renderVideoCard(v,v.allowDelete);
-  overlay.style.display='flex';
-}
-function closeVideoDetail(){
-  document.getElementById('video-detail-overlay').style.display='none';
-  document.getElementById('video-detail-body').innerHTML='';
-}
 function renderVideoCard(v,allowDelete){
   const commentsId='vcomments-'+v.id;
   const uploaderHtml=v.user_name?`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer" onclick="openPublicProfile(${v.user_id})">
@@ -3438,7 +3394,6 @@ async function deleteMyVideo(id){
   if(!confirm('¿Borrar este vídeo?')) return;
   try{
     await fetch(`${LOCAL_DB_URL}/api/videos/${id}`,{method:'DELETE',headers:{'Authorization':'Bearer '+authToken}});
-    closeVideoDetail();
     renderMyVideos();
   }catch(e){ alert('No se pudo borrar el vídeo.'); }
 }
